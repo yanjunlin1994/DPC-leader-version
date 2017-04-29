@@ -40,6 +40,9 @@ const (
     LEADER_JUDGE = 63
     CRACK_DETAIL = 64
 )
+const (
+    ANOTHER_PIECE = 70
+)
 // String returns a string representation of a message.
 func (m *Message) String() string {
 	return m.Key.String() + ": " + string(m.Value)

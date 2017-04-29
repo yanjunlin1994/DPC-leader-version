@@ -8,59 +8,17 @@ import (
 	"os"
 	"math/rand"
 	"time"
-
 	"./wendy-modified"
 	"github.com/twinj/uuid"
 	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
 )
-
+//Important five variables!
 var cluster *wendy.Cluster
 var selfnode *wendy.Node
 var leaderComm *LeaderComm
 var leader *Leader
-var jobList []job // List of all jobs (currently just appends to end, but doesn't remove)
-var currentJob *job // Current job that is cleared on password verify or stop job
-
-// Struct for node entry for job entry
-type jobNode struct {
-	Node string
-	Alive bool
-}
-
-// Struct for a job entry
-type job struct {
-	HashType  int // Type of hash
-	HashValue string // Hash value
-	Origin    string // Original creator of job
-	Participants []jobNode // Updated list of nodes participating
-	Length    int
-	Start     int
-	Limit     int
-	Verified  bool
-}
-
-// Returns a list of currently connected nodes from Wendy
-func createJobNodeList() []jobNode{
-	var participants []jobNode
-	for _, entry := range cluster.GetListOfNodes(){
-		tmp := jobNode{entry.ID.String(), true}
-		participants = append(participants, tmp)
-	}
-	return participants
-}
-
-// Remove current job in joblist and clear currentJob
-func doneJob() {
-	for index, entry := range jobList {
-		if entry.HashValue == currentJob.HashValue && entry.HashType == currentJob.HashType && entry.Origin == currentJob.Origin{
-			jobList = append(jobList[:index], jobList[index+1:]...)
-			break
-		}
-	}
-	hashcatQueue = nil
-	currentJob = nil
-}
+var job *Job
 
 // Called by origin to stop hashcat and job
 func stopJob() {

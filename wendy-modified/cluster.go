@@ -36,10 +36,7 @@ type stateTables struct {
 // Cluster holds the information about the state of the network. It is the main interface to the distributed network of Nodes.
 type Cluster struct {
 	self               *Node
-	// table              *routingTable
-	// leafset            *leafSet
 	Neighborhoodset    *NeighborhoodSet
-    // WorkMateSet        *WorkMateSet
 	kill               chan bool
 	lastStateUpdate    time.Time
 	applications       []Application
@@ -53,19 +50,18 @@ type Cluster struct {
     working            bool
     blocked            bool
     waitQueue          []*Message
-	// proximityCache     *proximityCache
 }
 
 //newLeaves call OnNewLeaves handler
 func (c *Cluster) newLeaves(leaves []*Node) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	c.debug("[newLeaves]Sending newLeaves notifications.")
+	// c.lock.RLock()
+	// defer c.lock.RUnlock()
+	// c.debug("[newLeaves]Sending newLeaves notifications.")
 	for i, app := range c.applications {
 		app.OnNewLeaves(leaves)
-		c.debug("[newLeaves]Sent newLeaves notification %d of %d.", i+1, len(c.applications))
+		// c.debug("[newLeaves]Sent newLeaves notification %d of %d.", i+1, len(c.applications))
 	}
-	c.debug("[newLeaves]Sent newLeaves notifications.")
+	// c.debug("[newLeaves]Sent newLeaves notifications.")
 }
 //fanoutjoin call OnNodeJoin handler
 func (c *Cluster) fanOutJoin(node Node) {
@@ -77,23 +73,10 @@ func (c *Cluster) fanOutJoin(node Node) {
 		// c.debug("[fanOutJoin]Announced node join.")
 	}
 }
-//
-// func (c *Cluster) forward(msg Message, id NodeID) bool {
-// 	c.lock.RLock()
-// 	defer c.lock.RUnlock()
-// 	forward := true
-// 	for _, app := range c.applications {
-// 		f := app.OnForward(&msg, id)
-// 		if forward {
-// 			forward = f
-// 		}
-// 	}
-// 	return forward
-// }
 
 func (c *Cluster) marshalCredentials() []byte {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	// c.lock.RLock()
+	// defer c.lock.RUnlock()
 	if c.credentials == nil {
 		return []byte{}
 	}
@@ -101,31 +84,10 @@ func (c *Cluster) marshalCredentials() []byte {
 }
 
 func (c *Cluster) getNetworkTimeout() int {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	// c.lock.RLock()
+	// defer c.lock.RUnlock()
 	return c.networkTimeout
 }
-//
-// func (c *Cluster) cacheProximity(id NodeID, proximity int64) {
-// 	c.proximityCache.Lock()
-// 	defer c.proximityCache.Unlock()
-// 	c.proximityCache.cache[id] = proximity
-// }
-//
-// func (c *Cluster) getCachedProximity(id NodeID) int64 {
-// 	c.proximityCache.RLock()
-// 	defer c.proximityCache.RUnlock()
-// 	if proximity, set := c.proximityCache.cache[id]; set {
-// 		return proximity
-// 	}
-// 	return -1
-// }
-
-// func (c *Cluster) clearProximityCache() {
-// 	c.proximityCache.Lock()
-// 	defer c.proximityCache.Unlock()
-// 	c.proximityCache.cache = map[NodeID]int64{}
-// }
 
 func (c *Cluster) isJoined() bool {
 	c.lock.RLock()
@@ -192,10 +154,7 @@ func (c *Cluster) SetNetworkTimeout(timeout int) {
 func NewCluster(self *Node, credentials Credentials) *Cluster {
 	return &Cluster{
 		self:               self,
-		// table:              newRoutingTable(self),
-		// leafset:            newLeafSet(self),
 		Neighborhoodset:    newNeighborhoodSet(self),
-        // WorkMateSet:        newWorkMateSet(),
 		kill:               make(chan bool),
 		lastStateUpdate:    time.Now(),
 		applications:       []Application{},
@@ -209,7 +168,6 @@ func NewCluster(self *Node, credentials Credentials) *Cluster {
         working:            false,
         blocked:            false,
         waitQueue:          []*Message{},
-		// proximityCache:     newProximityCache(),
 	}
 }
 
@@ -221,10 +179,6 @@ func (c *Cluster) Stop() {
 	c.debug("[Stop]Sending graceful exit message.")
 	msg := c.NewMessage(NODE_EXIT, c.self.ID, []byte{})
     nodes := c.Neighborhoodset.list()
-
-	// Nodes := c.table.list([]int{}, []int{})
-	// Nodes = append(Nodes, c.leafset.list()...)
-	// Nodes = append(Nodes, c.neighborhoodset.list()...)
 	for _, node := range nodes {
         //send stop message to every node in neighborhood
 		err := c.send(msg, node)
@@ -276,13 +230,10 @@ func (c *Cluster) Listen() error {
 		}
 	}(ln, connections)
     go func() {
+        c.debug("[Listen]spin heartbeat thread")
 		for {
-            c.debug("[Listen]Send heartbeat thread")
+            c.debug("[Listen]Send heartbeat")
             c.sendHeartbeats()
-			// if err != nil {
-			// 	c.fanOutError(err)
-			// 	return
-			// }
             time.Sleep(time.Duration(c.heartbeatFrequency) * time.Second)
 		}
 	}()
@@ -295,10 +246,6 @@ func (c *Cluster) Listen() error {
 			// c.debug("[Listen]Handling connection.")
 			go c.handleClient(conn)
 			break
-		// case <-c.proximityCache.ticker:
-		// 	c.debug("[Listen]Emptying proximity cache...")
-		// 	go c.clearProximityCache()
-		// 	break
 		}
 	}
 	return nil
@@ -311,33 +258,18 @@ func (c *Cluster) Send(msg Message) error {
 	if err != nil {
 		return err
 	}
-
-	if target.ID.Equals(c.self.ID) && msg.Purpose != UNBLOCK_CLUSTER && msg.Purpose < WANT_TO_CRACK {
-		// c.debug("[Send]Couldn't find a target. Delivering message %s", msg.Key)
-		if msg.Purpose > NODE_ANN && msg.Purpose != UNBLOCK_CLUSTER {
-			c.deliver(msg)
-		}
-		return nil
-	}
-
+	// if target.ID.Equals(c.self.ID) && msg.Purpose != UNBLOCK_CLUSTER && msg.Purpose < WANT_TO_CRACK {
+	// 	// c.debug("[Send]Couldn't find a target. Delivering message %s", msg.Key)
+	// 	if msg.Purpose > NODE_ANN && msg.Purpose != UNBLOCK_CLUSTER {
+	// 		c.deliver(msg)
+	// 	}
+	// 	return nil
+	// }
 	err = c.send(msg, target)
 	if err == deadNodeError {
-	 //remove the dead node from NeighborhoodSet
 		c.remove(target.ID)
 	}
 	return err
-
-	// forward := c.forward(msg, target.ID)
-	// if forward {
-	// 	err = c.send(msg, target)
-	// 	if err == deadNodeError {
-    	//         //remove the dead node from NeighborhoodSet
-	// 		err = c.remove(target.ID)
-	// 	}
-	// 	return err
-	// }
-	//c.debug("[Send]Message %s wasn't forwarded because callback terminated it.", msg.Key)
-	//return nil
 }
 // Route checks the leafSet and routingTable to see if there's an appropriate match for the NodeID. If there is a better match than the current Node, a pointer to that Node is returned. Otherwise, nil is returned (and the message should be delivered).
 func (c *Cluster) Route(key NodeID) (*Node, error) {
@@ -345,7 +277,7 @@ func (c *Cluster) Route(key NodeID) (*Node, error) {
 	if err != nil {
         c.debug("[Route] route fails")
 		if err != nodeNotFoundError {
-            c.debug("[Route] route fails for nodeNotFoundError")
+            // c.debug("[Route] route fails for nodeNotFoundError")
 			return nil, err
 		}
         return nil, nil
@@ -370,10 +302,6 @@ func (c *Cluster) Join(ip string, port int) error {
 }
 
 func (c *Cluster) fanOutError(err error) {
-	c.debug(err.Error())
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	c.err(err.Error())
 	for _, app := range c.applications {
 		app.OnError(err)
 	}
@@ -381,22 +309,12 @@ func (c *Cluster) fanOutError(err error) {
 
 func (c *Cluster) sendHeartbeats() {
 	msg := c.NewMessage(HEARTBEAT, c.self.ID, []byte{})
-    	nodes := c.Neighborhoodset.heartbeatReceivers()
-	// Nodes := c.table.list([]int{}, []int{})
-	// Nodes = append(Nodes, c.leafset.list()...)
-	// Nodes = append(Nodes, c.neighborhoodset.list()...)
-	// sent := map[NodeID]bool{}
+    nodes := c.Neighborhoodset.heartbeatReceivers()
+
 	for _, node := range nodes {
 		if node == nil {
 			break
 		}
-        // if node.ID == c.self.ID {
-        //     continue
-        // }
-		// if _, set := sent[node.ID]; set {
-		// 	continue
-		// }
-		// c.debug("[sendHeartbeats]Sending heartbeat to %s", node.ID)
 		err := c.send(msg, node)
 		if err == deadNodeError {
 			err = c.remove(node.ID)
@@ -414,7 +332,6 @@ func (c *Cluster) sendHeartbeats() {
         	}
 			continue
 		}
-		// sent[node.ID] = true
 	}
 }
 //to handler

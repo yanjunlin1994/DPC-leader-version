@@ -13,7 +13,7 @@ const (
 )
 type Leader struct {
     isActive           bool  //if I am the leader now, I am active. Otherwise not active
-    isBackup           int  //if I am the back up node for leader
+    isBackup           bool  //if I am the back up node for leader
 	self               *wendy.Node
     cluster            *wendy.Cluster
 	chosenProposerID   wendy.NodeID   //current proposer's ID
@@ -26,7 +26,7 @@ type Leader struct {
 func NewLeader(self *wendy.Node, cluster *wendy.Cluster) *Leader {
 	return &Leader{
         isActive:           false,
-        isBackup:           NotBackup,
+        isBackup:           false,
 		self:               self,
         cluster:            cluster,
         chosenProposerID:   wendy.EmptyNodeID(),

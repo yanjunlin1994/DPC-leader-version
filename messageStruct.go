@@ -4,7 +4,7 @@ package main
 type MessageType byte
 
 const (
-	NEW_JOB = 20         //Used when sending/receiving a new hash cracking job
+	NEW_JOB = 20
 	STOP_JOB = 21
 	FOUND_PASS = 22
 	START_JOB = 23
@@ -19,6 +19,9 @@ const (
     WANT_TO_CRACK = 62
     LEADER_JUDGE = 63
     CRACK_DETAIL = 64
+)
+const (
+    ANOTHER_PIECE = 70
 )
 // Struct for new job message
 type NewJobMessage struct {

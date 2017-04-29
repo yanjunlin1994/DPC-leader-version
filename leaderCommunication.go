@@ -12,41 +12,35 @@ const (
 	LogLevelWarn
 	LogLevelError
 )
-//election status
+//election Status
 const (
 	NoElected = iota
 	WaitLeaderVictory
 	Elected
+    Crashed
 )
 const (
     HaventPropose = iota
 	WaitLeaderAgree
 	ReceiveLeaderAgree
-)
-const (
-    Notknow = iota
-	Deny
-	Agree
+    ReceiveLeaderDeny
 )
 // var wgElect sync.WaitGroup //wait for election end
 // var wgNewJobLeaderResponse sync.WaitGroup
 var aNewCrackProposal *CrackProposal
 type CrackProposal struct {
-    status             int
-    ifAgree            int
+    Status             int
     wgElect            *sync.WaitGroup
     wgLeaderResponse   *sync.WaitGroup
-    lock               *sync.RWMutex
 }
 type LeaderComm struct {
 	self               *wendy.Node
     cluster            *wendy.Cluster
 	lastHeardFrom      time.Time
-	connected          bool  //if I am connected to the leader
-    electionStatus     int
+	Status             int
     currentLeader      wendy.NodeID
     ifLeader           bool  //if I am the leader
-    hasProposal        bool
+    PendingProcessQueue    []string
     // Leader             *Leader
 	lock               *sync.RWMutex
     log                *log.Logger
@@ -54,11 +48,9 @@ type LeaderComm struct {
 }
 func NewCrackProposal() *CrackProposal {
     return &CrackProposal{
-        status:            HaventPropose,
-        ifAgree:           Notknow,
+        Status:            HaventPropose,
         wgElect:           new(sync.WaitGroup),
         wgLeaderResponse:  new(sync.WaitGroup),
-		lock:              new(sync.RWMutex),
 	}
 }
 func NewLeaderComm(self *wendy.Node, cluster *wendy.Cluster) *LeaderComm {
@@ -66,11 +58,10 @@ func NewLeaderComm(self *wendy.Node, cluster *wendy.Cluster) *LeaderComm {
 		self:               self,
         cluster:            cluster,
         lastHeardFrom:      time.Time{},
-        connected:          false,
-        electionStatus:     NoElected,
+        Status:             NoElected,
         currentLeader:      wendy.EmptyNodeID(),
         ifLeader:           false,
-        hasProposal:        false,
+        PendingProcessQueue:[]string{},
         // Leader:             nil,
 		lock:               new(sync.RWMutex),
         log:                log.New(os.Stdout, "LEADERCOMM ("+self.ID.String()+") ", log.LstdFlags),
@@ -94,15 +85,17 @@ func (l *LeaderComm) ProposeNewJob() bool{
 //tell leader I want to crack a password
 func (l *LeaderComm) tellLeaderIwantToCrack() bool {
     l.debug("[tellLeaderIwantToCrack] ")
-    aNewCrackProposal.status = WaitLeaderAgree
+    aNewCrackProposal.Status = WaitLeaderAgree
     aNewCrackProposal.wgLeaderResponse.Add(1)
     msg := l.cluster.NewMessage(WANT_TO_CRACK, l.currentLeader, nil)
     l.cluster.Send(msg)
     aNewCrackProposal.wgLeaderResponse.Wait()
-    if aNewCrackProposal.ifAgree == Agree {
+    if aNewCrackProposal.Status == ReceiveLeaderAgree {
         return true
-    } else {
+    } else if aNewCrackProposal.Status == ReceiveLeaderDeny {
         return false
+    } else {
+        l.debug("DANGEROUS")
     }
 }
 func (l *LeaderComm) SendCrackJobDetailsToLeader(hashtype string, hash string, pwdlength int) {
@@ -112,14 +105,18 @@ func (l *LeaderComm) SendCrackJobDetailsToLeader(hashtype string, hash string, p
         panic(err)
     }
     msg := l.cluster.NewMessage(CRACK_DETAIL, l.currentLeader, data)
-    l.cluster.Send(msg)
+    err := l.cluster.Send(msg)
+    if err != nil {
+        l.debug("[NotifyLeaderIStop] add to PendingProcessQueue")
+        l.PendingProcessQueue = append(l.PendingProcessQueue, "I_STOP")
+    }
 }
 func (l *LeaderComm) ReceiveLeaderJudgement(ifAgree bool) {
     l.debug("[ReceiveLeaderJudgement] ")
     if ifAgree {
-        aNewCrackProposal.ifAgree = Agree
+        aNewCrackProposal.Status = ReceiveLeaderAgree
     } else {
-        aNewCrackProposal.ifAgree = Deny
+        aNewCrackProposal.Status = ReceiveLeaderDeny
     }
     aNewCrackProposal.wgLeaderResponse.Done()
 }
@@ -183,6 +180,25 @@ func (l *LeaderComm) broadCastMessage(msgType byte, data []byte) {
             l.cluster.Send(msg)
         }
     }
+}
+func (l *LeaderComm) NotifyLeaderIStop() {
+    msg := l.cluster.NewMessage(I_STOP, l.currentLeader, nil)
+    err := l.cluster.Send(msg)
+    if err != nil {
+        l.debug("[NotifyLeaderIStop] add to PendingProcessQueue")
+        l.PendingProcessQueue = append(l.PendingProcessQueue, "I_STOP")
+    }
+}
+func (l *LeaderComm) AskLeaderANewPiece() {
+    msg := l.cluster.NewMessage(ANOTHER_PIECE, l.currentLeader, nil)
+    err := l.cluster.Send(msg)
+    if err != nil {
+        l.debug("[NotifyLeaderIStop] add to PendingProcessQueue")
+        l.PendingProcessQueue = append(l.PendingProcessQueue, "ANOTHER_PIECE")
+    }
+}
+func (l *LeaderComm) ProcessPendingProcessQueue() {
+
 }
 func (l *LeaderComm) Test(format string, v ...interface{}) {
 	l.log.Printf(format, v...)
