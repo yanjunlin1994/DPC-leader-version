@@ -25,6 +25,7 @@ const (
 	ReceiveLeaderAgree
     ReceiveLeaderDeny
 )
+var hasProposol bool = false
 // var wgElect sync.WaitGroup //wait for election end
 // var wgNewJobLeaderResponse sync.WaitGroup
 var aNewCrackProposal *CrackProposal
@@ -36,9 +37,10 @@ type CrackProposal struct {
 type LeaderComm struct {
 	self               *wendy.Node
     cluster            *wendy.Cluster
-	lastHeardFrom      time.Time
+	// lastHeardFrom      time.Time
 	Status             int
     currentLeader      wendy.NodeID
+    currentBackup      wendy.NodeID
     ifLeader           bool  //if I am the leader
     PendingProcessQueue    []string
     // Leader             *Leader
@@ -57,9 +59,10 @@ func NewLeaderComm(self *wendy.Node, cluster *wendy.Cluster) *LeaderComm {
 	return &LeaderComm{
 		self:               self,
         cluster:            cluster,
-        lastHeardFrom:      time.Time{},
+        // lastHeardFrom:      time.Time{},
         Status:             NoElected,
         currentLeader:      wendy.EmptyNodeID(),
+        currentBackup:      wendy.EmptyNodeID(),
         ifLeader:           false,
         PendingProcessQueue:[]string{},
         // Leader:             nil,
@@ -72,9 +75,9 @@ func NewLeaderComm(self *wendy.Node, cluster *wendy.Cluster) *LeaderComm {
 //propose a new cracking job
 func (l *LeaderComm) ProposeNewJob() bool{
     l.debug("[ProposeNewJob]")
+    hasProposol = true
     aNewCrackProposal = NewCrackProposal()
-    l.hasProposal = true
-    if l.electionStatus != Elected {
+    if l.Status == NoElected {
         aNewCrackProposal.wgElect.Add(1)
         l.proposeElection()
         aNewCrackProposal.wgElect.Wait()
@@ -96,16 +99,18 @@ func (l *LeaderComm) tellLeaderIwantToCrack() bool {
         return false
     } else {
         l.debug("DANGEROUS")
+        return false
     }
 }
 func (l *LeaderComm) SendCrackJobDetailsToLeader(hashtype string, hash string, pwdlength int) {
+    l.debug("[SendCrackJobDetailsToLeader] ")
     payload := CrackJobDetailsMessage{HashType: hashtype, Hash: hash, Pwdlength:pwdlength}
     data, err := bson.Marshal(payload)
     if err != nil {
         panic(err)
     }
     msg := l.cluster.NewMessage(CRACK_DETAIL, l.currentLeader, data)
-    err := l.cluster.Send(msg)
+    err = l.cluster.Send(msg)
     if err != nil {
         l.debug("[NotifyLeaderIStop] add to PendingProcessQueue")
         l.PendingProcessQueue = append(l.PendingProcessQueue, "I_STOP")
@@ -136,7 +141,7 @@ func (l *LeaderComm) proposeElection() {
 func (l *LeaderComm) ReceiveVictoryFromLeader(lid wendy.NodeID) {
     l.debug("[ReceiveVictoryFromLeader]")
     l.setNewLeader(lid)
-    if (l.hasProposal) {
+    if (hasProposol) {
         aNewCrackProposal.wgElect.Done()
     }
 
@@ -145,27 +150,27 @@ func (l *LeaderComm) setNewLeader(lid wendy.NodeID) {
     l.debug("[setNewLeader]")
     l.lock.Lock()
     defer l.lock.Unlock()
-    l.connected = true
-    l.electionStatus = Elected
+    l.Status = Elected
     l.currentLeader = lid
-    l.lastHeardFrom = time.Now()
+    // l.lastHeardFrom = time.Now()
 }
 //notify the first node there is an election and you are the leader
 func (l *LeaderComm) notifyLeaderElection(lid wendy.NodeID) {
     l.debug("[notifyLeaderElection]")
-    l.electionStatus = WaitLeaderVictory
+    l.Status = WaitLeaderVictory
     msg := l.cluster.NewMessage(YOU_ARE_LEADER, lid, nil)
     l.cluster.Send(msg)
 }
 func (l *LeaderComm) BecomeLeader() {
     l.debug("[BecomeLeader]")
-    l.electionStatus = Elected
+    l.Status = Elected
     l.currentLeader = l.self.ID
     l.ifLeader = true
     l.broadcastVictory()
 }
 //Leader use this function to broadcast victory of election
 func (l *LeaderComm) broadcastVictory() {
+    l.debug("broadcastVictory")
     l.broadCastMessage(LEADER_VIC, nil)
 }
 //broadcast messasge to all other nodes

@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"os/signal"
+    "strconv"
 )
 
 func main() {
@@ -59,12 +60,14 @@ func ClusterManagementEntrance(userChoice int) {
 }
 func AskForWhatToDo() string{
     role := ""
-    for (role != "crack") && (role != "help") {
-        fmt.Println("Do you want crack a hash (type 'crack') or just help other
-                    nodes in cracking their hash (type 'help')?")
+    for {
+        fmt.Println("Crack (type 'crack') or Help others (type 'help')?")
     	fmt.Scanf("%s\n", &role)
         if (role != "crack") && (role != "help") {
             fmt.Println("wrong input, try again")
+            continue
+        } else {
+            break
         }
     }
     return role
@@ -85,7 +88,11 @@ func crackJobEntrance() {
         details := getHashDetails()
         detailArray := strings.Split(details, ",")
         fmt.Println("Hash details" + detailArray[0] + "  "+ detailArray[1] + "  " + detailArray[2])
-        leaderComm.SendCrackJobDetailsToLeader(detailArray[0], detailArray[1], detailArray[2])
+        pwdl, err := strconv.Atoi(detailArray[2])
+        if (err != nil) {
+            panic(err)
+        }
+        leaderComm.SendCrackJobDetailsToLeader(detailArray[0], detailArray[1], pwdl)
     } else {
         fmt.Println("You can't crack, someone has already initiated a job")
     }
@@ -101,7 +108,7 @@ func proposeNewCrackingJob() bool {
 func getHashDetails() string{
     var hashType, hash string
     var pwdlength int
-    for () {
+    for {
         fmt.Println("1. What type of hash do you want to crack (MD5/SHA1/SHA256)?")
     	fmt.Scanf("%s\n", &hashType)
         if (strings.EqualFold(hashType, "MD5") || strings.EqualFold(hashType, "SHA1") || strings.EqualFold(hashType, "SHA256") ) {

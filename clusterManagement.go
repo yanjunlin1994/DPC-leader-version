@@ -10,7 +10,6 @@ import (
 	"time"
 	"./wendy-modified"
 	"github.com/twinj/uuid"
-	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
 )
 //Important five variables!
@@ -20,60 +19,6 @@ var leaderComm *LeaderComm
 var leader *Leader
 var job *Job
 
-// Called by origin to stop hashcat and job
-func stopJob() {
-	var nextNode *wendy.Node
-
-	if currentJob == nil {
-		fmt.Println("No current job to stop. Your process might have been already killed")
-		return
-	}
-
-	// Stop hashcat if its still running
-	if HashcatJob != nil {
-		err := HashcatJob.Process.Kill()
-		if err != nil {
-			fmt.Println("Failed to kill hashcat on stop message?")
-			panic(err)
-		}
-		HashcatJob = nil
-	}
-
-	// Now, send a message to your successor to stop the process
-	nodesCount := cluster.NumOfNodes()
-	nodes := cluster.GetListOfNodes()
-
-	payload := StopJobMessage{currentJob.HashValue,currentJob.HashType, currentJob.Origin}
-
-	data, err := bson.Marshal(payload)
-	if err != nil {
-		fmt.Println("err in clusterManagement:marshall")
-		panic(err)
-		return
-	}
-
-	// Send message on to next person if more than just self
-	if nodesCount > 1 {
-		// Find index of self in list
-		index := 0
-		for i, nodeIterate := range nodes {
-			if nodeIterate.ID.Equals(selfnode.ID) {
-				index = i
-			}
-		}
-
-		// Loop back to start if the node is last in list
-		if (index + 1) == cluster.NumOfNodes(){
-			index = -1
-		}
-		nextNode = nodes[index+1]
-
-		msg := cluster.NewMessage(STOP_JOB, nextNode.ID, data)
-		cluster.Send(msg)
-	}
-
-	doneJob()
-}
 
 func ClusterManagement(option int) {
 	var wendyPort int = 18818

@@ -43,6 +43,9 @@ const (
 const (
     ANOTHER_PIECE = 70
 )
+const (
+    INIT_BACKUP = 90
+)
 // String returns a string representation of a message.
 func (m *Message) String() string {
 	return m.Key.String() + ": " + string(m.Value)

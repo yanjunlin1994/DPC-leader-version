@@ -57,7 +57,7 @@ func (c *Cluster) newLeaves(leaves []*Node) {
 	// c.lock.RLock()
 	// defer c.lock.RUnlock()
 	// c.debug("[newLeaves]Sending newLeaves notifications.")
-	for i, app := range c.applications {
+	for _, app := range c.applications {
 		app.OnNewLeaves(leaves)
 		// c.debug("[newLeaves]Sent newLeaves notification %d of %d.", i+1, len(c.applications))
 	}
@@ -253,7 +253,7 @@ func (c *Cluster) Listen() error {
 
 // Send routes a message through the Cluster.
 func (c *Cluster) Send(msg Message) error {
-	c.debug("[Send]Getting target for message %s", msg.Key)
+	// c.debug("[Send]Getting target for message %s", msg.Key)
 	target, err := c.Route(msg.Key)
 	if err != nil {
 		return err
@@ -359,10 +359,16 @@ func (c *Cluster) deliverLeaderElection(msg Message) {
 		app.OnLeaderElectionDeliver(msg)
 	}
 }
-func (c *Cluster) deliverNewProposal(msg Message) {
-    c.debug("[deliverNewProposal]")
+func (c *Cluster) deliverNewProposalfromClient(msg Message) {
+    c.debug("[deliverNewProposalfromClient]")
 	for _, app := range c.applications {
 		app.OnNewProposalDeliver(msg)
+	}
+}
+func (c *Cluster) deliverNewBackUpInitFromLeader(msg Message) {
+    c.debug("[deliverNewBackUpInitFromLeaderl]")
+	for _, app := range c.applications {
+		app.OnNewBackUpInit(msg)
 	}
 }
 //initiate workmateset using current neighborhoodset
@@ -432,9 +438,9 @@ func (c *Cluster) handleClient(conn net.Conn) {
 	case HEARTBEAT:
 		// c.lock.RLock()
 		// defer c.lock.RUnlock()
-		for _, app := range c.applications {
-			app.OnHeartbeat(msg.Sender)
-		}
+		// for _, app := range c.applications {
+		// 	app.OnHeartbeat(msg.Sender)
+		// }
 		break
 	case STAT_DATA:
 		c.onStateReceived(msg)
@@ -463,13 +469,16 @@ func (c *Cluster) handleClient(conn net.Conn) {
         break
 
     case WANT_TO_CRACK:
-        c.deliverNewProposal(msg)
+        c.deliverNewProposalfromClient(msg)
         break
     case LEADER_JUDGE:
-        c.deliverNewProposal(msg)
+        c.deliverNewProposalfromClient(msg)
         break
     case CRACK_DETAIL:
-        c.deliverNewProposal(msg)
+        c.deliverNewProposalfromClient(msg)
+        break
+    case INIT_BACKUP:
+        c.deliverNewBackUpInitFromLeader(msg)
         break
 	default:
 		c.onMessageReceived(msg)
@@ -779,6 +788,7 @@ func (c *Cluster) onStateRequested(msg Message) {
 // }
 
 func (c *Cluster) onMessageReceived(msg Message) {
+    panic("onMessageReceived")
 	c.debug("[onMessageReceived]Received message %s", msg.Key)
 	err := c.Send(msg)
 	if err != nil {

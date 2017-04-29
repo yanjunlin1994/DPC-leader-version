@@ -1,5 +1,7 @@
 package main
-
+// import (
+//     "./wendy-modified"
+// )
 // Message numbers
 type MessageType byte
 
@@ -22,6 +24,10 @@ const (
 )
 const (
     ANOTHER_PIECE = 70
+    I_STOP = 71
+)
+const (
+    INIT_BACKUP = 90
 )
 // Struct for new job message
 type NewJobMessage struct {
@@ -53,19 +59,23 @@ type FoundMessage struct {
 	HashValue string
 	HashType  int
 	Password  string
-	Origin string
 }
 
 // Struct for block cluster message
-type BlockClusterMessage struct {
-	Origin string
-}
-
-type unBlockClusterMessage struct {
-	Origin string
-}
+// type BlockClusterMessage struct {
+// 	Origin string
+// }
+//
+// type unBlockClusterMessage struct {
+// 	Origin string
+// }
 type CrackJobDetailsMessage struct {
     HashType string
     Hash string
     Pwdlength int
+}
+type InitializeBackUpMessage struct {
+    chosenProposerID   string
+    BackUps            string
+    JobMap             map[string]string
 }

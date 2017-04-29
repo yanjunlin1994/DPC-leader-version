@@ -10,6 +10,11 @@ import (
 	"os/exec"
     "strings"
     "gopkg.in/mgo.v2/bson"
+    "./wendy-modified"
+    "crypto/md5"
+	"crypto/sha1"
+	"crypto/sha256"
+	"encoding/hex"
 )
 
 const (
@@ -62,7 +67,10 @@ func (j *Job) StartJob() {
     result := j.startCrack()
     if (result == 1) {
         j.SetStatus(Found)
-        foundPassword := j.getFoundedPassword()
+        foundPassword, err := j.getFoundedPassword()
+        if (err != nil) {
+            panic(err)
+        }
         j.announceFound(foundPassword)
     } else {
         j.SetStatus(WaitForNew)
@@ -73,7 +81,7 @@ func (j *Job) SetStatus(s int) {
     fmt.Println("[JOB] SetStatus" + strconv.Itoa(s))
     j.Status = s
 }
-func (j *Job) startCrack() int{
+func (j *Job) startCrack() int {
     app := "./hashcat-3.5.0/hashcat"
     arg0 := "-a"
     arg1 := "3"
@@ -89,8 +97,8 @@ func (j *Job) startCrack() int{
     mask := ""
     for i := 0; i < j.Length; i++ {
 		mask = mask + "?l"
-
-    unique := self.ID.String()
+    }
+    unique := j.self.ID.String()
 
     if runtime.GOOS == "windows" {
 		j.HashcatJob = exec.Command(app, arg0, arg1, arg2, strconv.Itoa(j.HashType),
@@ -101,11 +109,10 @@ func (j *Job) startCrack() int{
             arg3, strconv.Itoa(j.Start), arg4, strconv.Itoa(j.Limit), j.HashValue,
             mask, arg5, arg6, arg7, arg8,unique,arg9,arg10,j.Outfile )
 	}
-    fmt.Println("[JOB] Running hashcat. Key space is " + strconv.Itoa(j.Start)
-                + " to " + strconv.Itoa(j.Start + j.Limit))
+    fmt.Println("[JOB] Running hashcat. Key space is " + strconv.Itoa(j.Start) + " to " + strconv.Itoa(j.Start + j.Limit))
 
-    stdout, err := HashcatJob.Output()
-	HashcatJob = nil
+    stdout, err := j.HashcatJob.Output()
+	j.HashcatJob = nil
 
     if err != nil {
 		switch err.Error() {
@@ -132,27 +139,27 @@ func (j *Job) startCrack() int{
 	foundFlag := strings.Index(result, "Cracked")
 
 	if foundFlag > 0 {
-		fmt.Println("[JOB] I found the password for the hash! Please memorize
-                 it as I am deleting it from my side for security reasons")
+		fmt.Println("[JOB] Found password")
 		return 1
 	} else {
 		fmt.Println("[JOB] Code can never reach here. DANGEROUS!")
 	}
+    return -1
 }
-func (j *Job) getFoundedPassword() string{
+func (j *Job) getFoundedPassword() (string, error) {
     outfileContents, err := ioutil.ReadFile(j.Outfile)
     if err != nil {
         fmt.Print(err)
     }
     passwordsplit := strings.SplitN(string(outfileContents), ":", 2)
     foundPassword := passwordsplit[1]
-    fmt.Println("[JOB] Found password:" + passwordsplit[1])
+    fmt.Println("[JOB] Found password is:" + passwordsplit[1])
     err = os.Remove(j.Outfile)
     if err != nil {
         fmt.Print(err)
-        return ""
+        return "", err
     }
-    return foundPassword
+    return foundPassword, nil
 }
 func (j *Job) announceFound(foundPassword string) {
 	nodes := j.cluster.GetListOfNodes()
@@ -163,26 +170,26 @@ func (j *Job) announceFound(foundPassword string) {
     }
     fmt.Println("[JOB] Notifying everyone that I have found the password")
 
-	payload := FoundMessage{HashType: hashType, HashValue: hash, Password: foundPassword, Origin: j.self.ID.String()}
+	payload := FoundMessage{HashType: j.HashType, HashValue: j.HashValue, Password: foundPassword}
 	data, err := bson.Marshal(payload)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
     for _, nodeIterate := range nodes {
-        if !nodeIterate.ID.Equals(self.ID) {
+        if !nodeIterate.ID.Equals(j.self.ID) {
             msg := j.cluster.NewMessage(FOUND_PASS, nodeIterate.ID, data)
             j.cluster.Send(msg) //no need to check error
         }
     }
 }
 func (j *Job) askLeaderANewPiece() {
-    err = os.Remove(j.Outfile)
+    err := os.Remove(j.Outfile)
     if err != nil {
         fmt.Print(err)
     }
     fmt.Println("[JOB] Ask leader for a new piece")
-    l.leaderComm.AskLeaderANewPiece()
+    j.leaderComm.AskLeaderANewPiece()
 }
 func (j *Job) Stop() {
     err := j.killHashCat()
@@ -204,7 +211,45 @@ func (j *Job) killHashCat() error {
         panic(err)
     }
     j.HashcatJob = nil
+    return nil
 }
 func (j *Job) notifyLeaderStop() {
-    l.leaderComm.NotifyLeaderIStop()
+    j.leaderComm.NotifyLeaderIStop()
+}
+func (j *Job) VerifyFoundedPassword(msg wendy.Message) bool{
+    tmpList := &FoundMessage{}
+    err := bson.Unmarshal(msg.Value, tmpList)
+    if err != nil {
+        panic(err)
+    }
+    var receivedPassword []string
+    if runtime.GOOS == "windows" {
+        receivedPassword = strings.Split(tmpList.Password, "\r\n")
+    } else {
+        receivedPassword = strings.Split(tmpList.Password, "\n")
+    }
+    if tmpList.HashType == 0 {
+        ReceivedPasswordHash := md5.Sum([]byte(receivedPassword[0]))
+        if hex.EncodeToString(ReceivedPasswordHash[:]) == j.HashValue {
+            return true
+        }
+    } else if tmpList.HashType == 100 {
+        ReceivedPasswordHash := sha1.Sum([]byte(receivedPassword[0]))
+        if hex.EncodeToString(ReceivedPasswordHash[:]) == j.HashValue {
+            return true
+        }
+    } else if tmpList.HashType == 100 {
+        ReceivedPasswordHash := sha1.Sum([]byte(receivedPassword[0]))
+        if hex.EncodeToString(ReceivedPasswordHash[:]) == j.HashValue {
+            return true
+        }
+    } else if tmpList.HashType == 1400 {
+        ReceivedPasswordHash := sha256.Sum256([]byte(receivedPassword[0]))
+        if hex.EncodeToString(ReceivedPasswordHash[:]) == j.HashValue {
+            return true
+        }
+    } else {
+        return false
+    }
+    return false
 }

@@ -36,6 +36,7 @@ type Application interface {
 	OnHeartbeat(node Node)
     OnLeaderElectionDeliver(msg Message)
     OnNewProposalDeliver(msg Message)
+    OnNewBackUpInit(msg Message)
 }
 
 // Credentials is an interface that can be fulfilled to limit access to the Cluster.
