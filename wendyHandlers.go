@@ -10,7 +10,7 @@ import (
 // Distributed Password Cracker struct
 type WendyHandlers struct {
 	node    *wendy.Node
-	cluster *wendy.Cluster
+	// cluster *wendy.Cluster
 }
 //--------------------------------Leader Communication part--------------------
 func (app *WendyHandlers) OnLeaderElectionDeliver(msg wendy.Message) {
@@ -93,6 +93,7 @@ func (app *WendyHandlers) OnReceiveFoundPass(msg wendy.Message) {
 }
 func (app *WendyHandlers) OnAskAnotherPiece(msg wendy.Message) {
     fmt.Println("[Handler] OnAskAnotherPiece")
+    // leader.ReceiveRequestForAnotherPiece(msg.Sender.ID)
 
 }
 func (app *WendyHandlers) OnDeliver(msg wendy.Message) {

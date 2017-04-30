@@ -80,7 +80,8 @@ func ClusterManagement(option int) {
 		}
 	}()
 
-	wendyHandlers := &WendyHandlers{selfnode, cluster}
+	// wendyHandlers := &WendyHandlers{selfnode, cluster}
+    wendyHandlers := &WendyHandlers{selfnode}
 	cluster.RegisterCallback(wendyHandlers)
 	// Join initial node's cluster
 	if option == 2 {
