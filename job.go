@@ -44,7 +44,7 @@ func (j *Job) String() string {
 	return "[JOB]" + strconv.Itoa(j.Start) + " += " + strconv.Itoa(j.Limit)
 }
 
-func (j *Job) NewJob(self *wendy.Node, cluster *wendy.Cluster,
+func NewJob(self *wendy.Node, cluster *wendy.Cluster,
                     leaderComm *LeaderComm,
                     Hasht int, Hashv string, Len int, St int, Lm int) *Job {
 	return &Job{
@@ -73,12 +73,15 @@ func (j *Job) StartJob() {
         }
         j.announceFound(foundPassword)
     } else {
-        j.SetStatus(WaitForNew)
-        j.askLeaderANewPiece()
+        if j.Status != Found {
+            j.SetStatus(WaitForNew)
+            j.askLeaderANewPiece()
+        }
+
     }
 }
 func (j *Job) SetStatus(s int) {
-    fmt.Println("[JOB] SetStatus" + strconv.Itoa(s))
+    fmt.Println("[JOB] SetStatus: " + strconv.Itoa(s))
     j.Status = s
 }
 func (j *Job) startCrack() int {
@@ -184,12 +187,11 @@ func (j *Job) announceFound(foundPassword string) {
     }
 }
 func (j *Job) askLeaderANewPiece() {
-    err := os.Remove(j.Outfile)
-    if err != nil {
-        fmt.Print(err)
+    if (j.Status != Found) {
+        fmt.Println("[JOB] Ask leader for a new piece")
+        j.leaderComm.AskLeaderANewPiece()
     }
-    fmt.Println("[JOB] Ask leader for a new piece")
-    j.leaderComm.AskLeaderANewPiece()
+
 }
 func (j *Job) Stop() {
     err := j.killHashCat()
@@ -201,7 +203,7 @@ func (j *Job) Stop() {
 }
 func (j *Job) killHashCat() error {
     fmt.Println("[JOB] killHashCat")
-    if (j.Status != 0) || (j.HashcatJob == nil){
+    if (j.HashcatJob == nil) {
         fmt.Println("[JOB] no hashcat running")
         return errors.New("ERROR: no hashcat running, can't kill")
     }
@@ -216,7 +218,16 @@ func (j *Job) killHashCat() error {
 func (j *Job) notifyLeaderStop() {
     j.leaderComm.NotifyLeaderIStop()
 }
-func (j *Job) VerifyFoundedPassword(msg wendy.Message) bool{
+func (j *Job) ReceiveFoundPass(msg wendy.Message) {
+    real, psw := j.verifyFoundedPassword(msg)
+    if (real) {
+        fmt.Println("[JOB] Receive correct password: " + psw)
+        j.SetStatus(Found)
+        j.killHashCat()
+    }
+
+}
+func (j *Job) verifyFoundedPassword(msg wendy.Message) (bool, string){
     tmpList := &FoundMessage{}
     err := bson.Unmarshal(msg.Value, tmpList)
     if err != nil {
@@ -231,25 +242,25 @@ func (j *Job) VerifyFoundedPassword(msg wendy.Message) bool{
     if tmpList.HashType == 0 {
         ReceivedPasswordHash := md5.Sum([]byte(receivedPassword[0]))
         if hex.EncodeToString(ReceivedPasswordHash[:]) == j.HashValue {
-            return true
+            return true, receivedPassword[0]
         }
     } else if tmpList.HashType == 100 {
         ReceivedPasswordHash := sha1.Sum([]byte(receivedPassword[0]))
         if hex.EncodeToString(ReceivedPasswordHash[:]) == j.HashValue {
-            return true
+            return true, receivedPassword[0]
         }
     } else if tmpList.HashType == 100 {
         ReceivedPasswordHash := sha1.Sum([]byte(receivedPassword[0]))
         if hex.EncodeToString(ReceivedPasswordHash[:]) == j.HashValue {
-            return true
+            return true, receivedPassword[0]
         }
     } else if tmpList.HashType == 1400 {
         ReceivedPasswordHash := sha256.Sum256([]byte(receivedPassword[0]))
         if hex.EncodeToString(ReceivedPasswordHash[:]) == j.HashValue {
-            return true
+            return true, receivedPassword[0]
         }
     } else {
-        return false
+        return false, ""
     }
-    return false
+    return false, ""
 }

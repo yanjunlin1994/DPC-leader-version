@@ -16,6 +16,20 @@ type WholeJob struct {
     HashValue          string
     Pwdlength          int
 }
+type JobEntry struct {
+    SeqNum          int     `json:"seqn,omitempty"`
+    Start           int    `json:"st,omitempty"`
+    End             int     `json:"ed,omitempty"`
+    Node            string  `json:"nd,omitempty"`
+    Status          int     `json:"stt,omitempty"`
+}
+// type JobEntry struct {
+//     SeqNum          int
+//     Start           int
+//     End             int
+//     Node            string
+//     Status          int
+// }
 type Leader struct {
     isActive           bool  //if I am the leader now, I am active. Otherwise not active
     isBackup           bool  //if I am the back up node for leader
@@ -25,7 +39,7 @@ type Leader struct {
 	chosenProposerID   wendy.NodeID   //current proposer's ID
     routineTimeStamp   int           //Time stamp to communicate with every worker
     updateTimeStamp    int          //Time stamp to update status to back up
-    JobMap             map[string]string
+    JobMap             []JobEntry
     wholeJob           *WholeJob
 	lock               *sync.RWMutex
     log                *log.Logger
@@ -38,6 +52,15 @@ func NewWholeJob(HashType int, HashValue string, Pwdlength int) *WholeJob {
         Pwdlength:          Pwdlength,
 	}
 }
+func NewJobEntry(seqNum int, start int, end int, node string, status int) *JobEntry {
+	return &JobEntry{
+        SeqNum:          seqNum,
+        Start:           start,
+        End:             end,
+        Node:            node,
+        Status:          status,
+	}
+}
 func NewLeader(self *wendy.Node, cluster *wendy.Cluster) *Leader {
 	return &Leader{
         isActive:           false,
@@ -48,7 +71,7 @@ func NewLeader(self *wendy.Node, cluster *wendy.Cluster) *Leader {
         chosenProposerID:   wendy.EmptyNodeID(),
         routineTimeStamp:   -1,
         updateTimeStamp:    -1,
-        JobMap:             map[string]string{},
+        JobMap:             []JobEntry{},
         wholeJob:           nil,
 		lock:               new(sync.RWMutex),
         log:                log.New(os.Stdout, "LEADER ("+self.ID.String()+") ", log.LstdFlags),
@@ -103,6 +126,7 @@ func (le *Leader) PreapreJob(HashType string, Hash string, Pwdlength int) error 
     keySpace, nodesCount := le.calculateKeySpace(HashType, Hash, Pwdlength)
     le.constructJobMap(keySpace, nodesCount)
     le.contactBackup()
+    le.giveFirstJob()
     return nil
 }
 func (le *Leader) calculateKeySpace(HashType string, Hash string, Pwdlength int) (int, int) {
@@ -133,32 +157,71 @@ func (le *Leader) calculateKeySpace(HashType string, Hash string, Pwdlength int)
 func (le *Leader) constructJobMap(keySpace int, nodesCount int) error {
 	limit := keySpace / (2 * nodesCount)
     pos := 0
+    seq := 0
     for {
         if (pos + limit >  keySpace) {
-            str := strconv.Itoa(pos) + "," + strconv.Itoa(keySpace)
-            le.JobMap[str] = "undone"
-            le.debug("[constructJobMap] str: " + str)
+            aJobEntry := NewJobEntry(seq, pos, keySpace, "none", -1)
+            le.JobMap = append(le.JobMap, *aJobEntry)
             break
         }
-        str := strconv.Itoa(pos) + "," + strconv.Itoa(pos + limit)
-        le.JobMap[str] = "undone"
+        aJobEntry := NewJobEntry(seq, pos, pos + limit, "none", -1)
+        le.JobMap = append(le.JobMap, *aJobEntry)
+
         pos = pos + limit
-        le.debug("[constructJobMap] str: " + str)
     }
+    le.printJobMap()
     return nil
+}
+//just for debug
+func (le *Leader) printJobMap() {
+    for _, job := range le.JobMap {
+        le.debug(strconv.Itoa(job.SeqNum) + " " + strconv.Itoa(job.Start) + " " +
+                    strconv.Itoa(job.End) + " " + job.Node + " " + strconv.Itoa(job.Status))
+
+	}
+}
+func (le *Leader) giveFirstJob() {
+    nodes := le.cluster.GetListOfNodes()
+    if (len(nodes) < 2) {
+        return
+    }
+    i := 0
+    for _, nodeIterate := range nodes {
+        jobentry := le.JobMap[i]
+        payload := NewJobMessage{HashType: le.wholeJob.HashType,
+                                 HashValue: le.wholeJob.HashValue,
+                                 Pwdlength: le.wholeJob.Pwdlength,
+                                 Start: jobentry.Start,
+                                 End:   jobentry.End}
+        data, err := bson.Marshal(payload)
+        msg := le.cluster.NewMessage(FIRST_JOB, nodeIterate.ID, data)
+        err = le.cluster.Send(msg)
+        if (err != nil) {
+            continue
+        } else {
+            le.JobMap[i].Node = nodeIterate.ID.String()
+            le.debug("[giveFirstJob] send to " + le.JobMap[i].Node)
+            i++
+        }
+        // if !nodeIterate.ID.Equals(le.self.ID) {
+        //
+        //
+        // }
+    }
+
 }
 func (le *Leader) contactBackup() {
     //TODO: if can't contact, use another node
     le.debug("[contactBackup]")
     //----- chose one backup for now
-    le.setBackup(le.chosenProposerID)
-    payload := InitializeBackUpMessage{chosenProposerID: le.chosenProposerID.String(),
-                                BackUps: le.BackUps.String(), JobMap: le.JobMap}
-    data, err := bson.Marshal(payload)
+    var backupID wendy.NodeID
+    backupID = le.chosenProposerID
+    le.setBackup(backupID)
+    payload := InitializeBackUpMessage{ChosenProposerID: le.chosenProposerID.String(), BackUps: backupID.String(), JobMap: le.JobMap}
+    data, err := json.Marshal(payload)
     if err != nil {
         panic(err)
     }
-
     message := le.cluster.NewMessage(INIT_BACKUP, le.BackUps, data)
     err = le.cluster.Send(message)
     if err != nil {
@@ -176,17 +239,18 @@ func (le *Leader) setBackup(bid wendy.NodeID) {
 func (le *Leader) BackUpReceiveInitFromLeader(msg wendy.Message) {
     le.debug("[BackUpReceiveInitFromLeader]")
     newInitializeBackUpMessage := &InitializeBackUpMessage{}
-    err := bson.Unmarshal(msg.Value, &newInitializeBackUpMessage)
+    err := json.Unmarshal(msg.Value, newInitializeBackUpMessage)
     if (err != nil) {
         panic(err)
     }
     le.lock.Lock()
-    le.chosenProposerID, _ =  wendy.NodeIDFromBytes([]byte(newInitializeBackUpMessage.chosenProposerID))
+    le.chosenProposerID, _ =  wendy.NodeIDFromBytes([]byte(newInitializeBackUpMessage.ChosenProposerID))
     le.BackUps, _ = wendy.NodeIDFromBytes([]byte(newInitializeBackUpMessage.BackUps))
     le.JobMap = newInitializeBackUpMessage.JobMap
+
     le.isBackup = true
     le.lock.Unlock()
-
+    le.printJobMap()
 }
 func (le *Leader) getTotoalKeySpace(mask string) int {
 	var keySpace int

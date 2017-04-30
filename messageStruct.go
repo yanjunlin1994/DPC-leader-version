@@ -23,22 +23,15 @@ const (
     CRACK_DETAIL = 64
 )
 const (
-    ANOTHER_PIECE = 70
-    I_STOP = 71
+    FIRST_JOB = 70
+    ASK_ANOTHER_PIECE = 71
+    I_STOP = 72
 )
 const (
     INIT_BACKUP = 90
 )
 // Struct for new job message
-type NewJobMessage struct {
-	HashType  int
-	HashValue string
-	Length    int
-	Start     int
-	Limit     int
-	Origin    string
-	Version	  int
-}
+
 
 // Struct for start latest job message
 type StartJobMessage struct {
@@ -54,12 +47,37 @@ type StopJobMessage struct {
 	Origin string
 }
 
+
+
+
+
+
+
+type NewJobMessage struct {
+	HashType      int
+	HashValue     string
+	Pwdlength     int
+	Start         int
+	End         int
+}
 // Struct for found password message
 type FoundMessage struct {
 	HashValue string
 	HashType  int
 	Password  string
 }
+
+type CrackJobDetailsMessage struct {
+    HashType string
+    Hash string
+    Pwdlength int
+}
+type InitializeBackUpMessage struct {
+    ChosenProposerID   string       `json:"cid,omitempty"`
+    BackUps            string       `json:"bu,omitempty"`
+    JobMap             []JobEntry  `json:"jm,omitempty"`
+}
+
 
 // Struct for block cluster message
 // type BlockClusterMessage struct {
@@ -69,13 +87,3 @@ type FoundMessage struct {
 // type unBlockClusterMessage struct {
 // 	Origin string
 // }
-type CrackJobDetailsMessage struct {
-    HashType string
-    Hash string
-    Pwdlength int
-}
-type InitializeBackUpMessage struct {
-    chosenProposerID   string
-    BackUps            string
-    JobMap             map[string]string
-}

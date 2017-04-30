@@ -5,6 +5,7 @@ import (
 	"./wendy-modified"
 	"gopkg.in/mgo.v2/bson"
 	"encoding/json"
+    "strconv"
 )
 // Distributed Password Cracker struct
 type WendyHandlers struct {
@@ -48,7 +49,7 @@ func (app *WendyHandlers) OnNewProposalDeliver(msg wendy.Message) {
                 fmt.Println(err)
                 return
             }
-            fmt.Printf("[OnNewProposalDeliver] %t", agree)
+            fmt.Printf("[OnNewProposalDeliver] %t \n", agree)
             leaderComm.ReceiveLeaderJudgement(agree)
         case CRACK_DETAIL:
             fmt.Println("[OnNewProposalDeliver]CRACK_DETAIL")
@@ -68,6 +69,30 @@ func (app *WendyHandlers) OnNewProposalDeliver(msg wendy.Message) {
 func (app *WendyHandlers) OnNewBackUpInit(msg wendy.Message) {
     fmt.Println("[Handler] OnNewBackUpInit")
     leader.BackUpReceiveInitFromLeader(msg)
+}
+func (app *WendyHandlers) OnFirstJob(msg wendy.Message) {
+    fmt.Println("[Handler] OnFirstJob")
+    newJob := &NewJobMessage{}
+    err := bson.Unmarshal(msg.Value, newJob)
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println("[Handler] OnFirstJob type: " + strconv.Itoa(newJob.HashType) +
+                " hashvalue: " + newJob.HashValue + " length: " +
+                strconv.Itoa(newJob.Pwdlength) + " start: " +
+                strconv.Itoa(newJob.Start) + " end: " + strconv.Itoa(newJob.End))
+
+    job = NewJob(selfnode, cluster, leaderComm, newJob.HashType, newJob.HashValue,
+                newJob.Pwdlength, newJob.Start, (newJob.End - newJob.Start))
+    go job.StartJob()
+
+}
+func (app *WendyHandlers) OnReceiveFoundPass(msg wendy.Message) {
+    fmt.Println("[Handler] OnReceiveFoundPass")
+    job.ReceiveFoundPass(msg)
+}
+func (app *WendyHandlers) OnAskAnotherPiece(msg wendy.Message) {
+    fmt.Println("[Handler] OnAskAnotherPiece")
 
 }
 func (app *WendyHandlers) OnDeliver(msg wendy.Message) {

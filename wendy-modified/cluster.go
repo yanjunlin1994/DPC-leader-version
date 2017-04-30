@@ -371,6 +371,24 @@ func (c *Cluster) deliverNewBackUpInitFromLeader(msg Message) {
 		app.OnNewBackUpInit(msg)
 	}
 }
+func (c *Cluster) deliverFirstJobFromLeader(msg Message) {
+    c.debug("[deliverFirstJobFromLeader]")
+	for _, app := range c.applications {
+		app.OnFirstJob(msg)
+	}
+}
+func (c *Cluster) deliverFoundPass(msg Message) {
+    c.debug("[deliverFoundPass]")
+	for _, app := range c.applications {
+		app.OnReceiveFoundPass(msg)
+	}
+}
+func (c *Cluster) deliverAskAnotherPiece(msg Message) {
+    c.debug("[deliverAskLeaderAnotherPiece]")
+	for _, app := range c.applications {
+		app.OnAskAnotherPiece(msg)
+	}
+}
 //initiate workmateset using current neighborhoodset
 // func (c *Cluster) initWorkMateSet() {
 //     c.debug("[initWorkMateSet] initiating working set")
@@ -423,7 +441,7 @@ func (c *Cluster) handleClient(conn net.Conn) {
 		}
 	}
 	conn.Write([]byte(`{"status": "Received."}`))
-	c.debug("[handleClient]Got message with purpose %v", msg.Purpose)
+	// c.debug("[handleClient]Got message with purpose %v", msg.Purpose)
 	msg.Hop = msg.Hop + 1
 	switch msg.Purpose {
 	case NODE_JOIN:
@@ -480,7 +498,14 @@ func (c *Cluster) handleClient(conn net.Conn) {
     case INIT_BACKUP:
         c.deliverNewBackUpInitFromLeader(msg)
         break
+    case FIRST_JOB:
+        c.deliverFirstJobFromLeader(msg)
+    case ASK_ANOTHER_PIECE:
+        c.deliverAskAnotherPiece(msg)
+    case FOUND_PASS:
+        c.deliverFoundPass(msg)
 	default:
+        c.debug("DANGEROUS")
 		c.onMessageReceived(msg)
 	}
 }
@@ -493,13 +518,10 @@ func (c *Cluster) send(msg Message, destination *Node) error {
 		return errors.New("[send]Can't send from a nil node.")
 	}
 	address := c.GetIP(*destination)
-	c.debug("[send]Sending message %s with purpose %d to %s", msg.Key, msg.Purpose, address)
+	// c.debug("[send]Sending message %s with purpose %d to %s", msg.Key, msg.Purpose, address)
 	// start := time.Now()
 	err := c.SendToIP(msg, address)
-	if err == nil {
-		// proximity := time.Since(start)
-		// destination.setProximity(int64(proximity))
-		// destination.updateLastHeardFrom()
+	if err != nil {
 	}
 	return err
 }
@@ -798,18 +820,6 @@ func (c *Cluster) onMessageReceived(msg Message) {
 //export the statetable (neighborhood)
 func (c *Cluster) dumpStateTables() (stateTables, error) {
 	var state stateTables
-	// if tables.includeRT() {
-	// 	routingTable := c.table.export(tables.Rows, tables.Cols)
-	// 	state.RoutingTable = &routingTable
-	// }
-	// if tables.includeLS() {
-	// 	leafSet := c.leafset.export()
-	// 	state.LeafSet = &leafSet
-	// }
-	// if tables.includeNS() {
-	// 	NeighborhoodSet := c.neighborhoodset.export()
-	// 	state.NeighborhoodSet = &NeighborhoodSet
-	// }
     neighborhoodSet := c.Neighborhoodset.export()
     state.NeighborhoodSet = &neighborhoodSet
 	return state, nil
@@ -987,21 +997,6 @@ func (c *Cluster) announcePresence() error {
 // 	return nil
 // }
 
-// func (c *Cluster) updateProximity(node *Node) error {
-// 	proximity := c.getCachedProximity(node.ID)
-// 	if proximity < 0 {
-// 		msg := c.NewMessage(HEARTBEAT, c.self.ID, []byte{})
-// 		c.debug("Checking proximity to %s", node.ID)
-// 		err := c.send(msg, node)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		c.debug("Proximity to %s checked.", node.ID)
-// 		c.cacheProximity(node.ID, node.getRawProximity())
-// 		c.debug("Proximity to %s cached.", node.ID)
-// 	}
-// 	return nil
-// }
 
 func (c *Cluster) insertMessage(msg Message) error {
 	var state stateTables
@@ -1088,27 +1083,6 @@ func (c *Cluster) printSets() {
 }
 func (c *Cluster) remove(id NodeID) error {
     c.debug("[remove] remove the node %s", id)
-	// resp, err := c.table.removeNode(id)
-	// if err != nil {
-	// 	return err
-	// }
-	// if resp != nil {
-	// 	err = c.repairTable(resp.ID)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
-	// resp, err = c.leafset.removeNode(id)
-	// if err != nil {
-	// 	return err
-	// }
-	// if resp != nil {
-	// 	err = c.repairLeafset(resp.ID)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	c.newLeaves(c.leafset.list())
-	// }
 	node, err := c.Neighborhoodset.removeNode(id)
 	if (err != nil) && (err != nodeNotFoundError) {
 		return err
@@ -1128,7 +1102,7 @@ func (c *Cluster) remove(id NodeID) error {
 func (c *Cluster) get(id NodeID) (*Node, error) {
 	node, err := c.Neighborhoodset.getNode(id)
 	if err == nodeNotFoundError {
-        c.debug("[get] node no found error")
+        // c.debug("[get] node no found error")
 	}
 	return node, err
 }

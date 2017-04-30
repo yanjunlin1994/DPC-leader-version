@@ -37,6 +37,9 @@ type Application interface {
     OnLeaderElectionDeliver(msg Message)
     OnNewProposalDeliver(msg Message)
     OnNewBackUpInit(msg Message)
+    OnFirstJob(msg Message)
+    OnReceiveFoundPass(msg Message)
+    OnAskAnotherPiece(msg Message)
 }
 
 // Credentials is an interface that can be fulfilled to limit access to the Cluster.

@@ -1,7 +1,6 @@
 package main
 import (
 	"os"
-	"time"
     "sync"
     "log"
 	"./wendy-modified"
@@ -40,7 +39,6 @@ type LeaderComm struct {
 	// lastHeardFrom      time.Time
 	Status             int
     currentLeader      wendy.NodeID
-    currentBackup      wendy.NodeID
     ifLeader           bool  //if I am the leader
     PendingProcessQueue    []string
     // Leader             *Leader
@@ -62,7 +60,6 @@ func NewLeaderComm(self *wendy.Node, cluster *wendy.Cluster) *LeaderComm {
         // lastHeardFrom:      time.Time{},
         Status:             NoElected,
         currentLeader:      wendy.EmptyNodeID(),
-        currentBackup:      wendy.EmptyNodeID(),
         ifLeader:           false,
         PendingProcessQueue:[]string{},
         // Leader:             nil,
@@ -195,11 +192,11 @@ func (l *LeaderComm) NotifyLeaderIStop() {
     }
 }
 func (l *LeaderComm) AskLeaderANewPiece() {
-    msg := l.cluster.NewMessage(ANOTHER_PIECE, l.currentLeader, nil)
+    msg := l.cluster.NewMessage(ASK_ANOTHER_PIECE, l.currentLeader, nil)
     err := l.cluster.Send(msg)
     if err != nil {
-        l.debug("[NotifyLeaderIStop] add to PendingProcessQueue")
-        l.PendingProcessQueue = append(l.PendingProcessQueue, "ANOTHER_PIECE")
+        l.debug("[AskLeaderANewPiece] leader fail, add to PendingProcessQueue")
+        l.PendingProcessQueue = append(l.PendingProcessQueue, "ASK_ANOTHER_PIECE")
     }
 }
 func (l *LeaderComm) ProcessPendingProcessQueue() {

@@ -130,7 +130,7 @@ func getHashDetails() string{
     				continue
                 }
     		}
-    		fmt.Println("3. How many characters do you think is the password? \n")
+    		fmt.Println("3. How many characters do you think is the password?")
     		fmt.Scanf("%d\n", &pwdlength)
             if pwdlength < 1 {
                 fmt.Println("wrong input, try again")

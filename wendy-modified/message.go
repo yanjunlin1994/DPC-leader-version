@@ -41,7 +41,9 @@ const (
     CRACK_DETAIL = 64
 )
 const (
-    ANOTHER_PIECE = 70
+    FIRST_JOB = 70
+    ASK_ANOTHER_PIECE = 71
+    I_STOP = 72
 )
 const (
     INIT_BACKUP = 90
