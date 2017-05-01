@@ -65,8 +65,8 @@ func (c *Cluster) newLeaves(leaves []*Node) {
 }
 //fanoutjoin call OnNodeJoin handler
 func (c *Cluster) fanOutJoin(node Node) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	// c.lock.RLock()
+	// defer c.lock.RUnlock()
 	for _, app := range c.applications {
 		// c.debug("[fanOutJoin]Announcing node join.")
 		app.OnNodeJoin(node)
@@ -275,7 +275,7 @@ func (c *Cluster) Send(msg Message) error {
 func (c *Cluster) Route(key NodeID) (*Node, error) {
     target, err := c.Neighborhoodset.route(key)
 	if err != nil {
-        c.debug("[Route] route fails")
+        // c.debug("[Route] route fails")
 		if err != nodeNotFoundError {
             // c.debug("[Route] route fails for nodeNotFoundError")
 			return nil, err

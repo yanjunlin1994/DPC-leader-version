@@ -142,6 +142,10 @@ func (app *WendyHandlers) OnDeliver(msg wendy.Message) {
 
 func (app *WendyHandlers) OnNodeJoin(node wendy.Node) {
 	fmt.Println("[Handler]Node joined: ", node.ID)
+    if (leader.GetActive()) {
+        fmt.Println("[Handler]Node joined. I am leader.")
+        leader.HandleNewNode(node.ID)
+    }
 }
 
 func (app *WendyHandlers) OnNodeExit(node wendy.Node) {

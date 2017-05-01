@@ -75,6 +75,7 @@ func NewLeader(self *wendy.Node, cluster *wendy.Cluster) *Leader {
 		logLevel:           LogLevelDebug,
 	}
 }
+
 func (le *Leader) CheckNewProposalAndRespond(msg wendy.Message) error {
     le.debug("[CheckNewProposalAndRespond]")
     if le.checkIfAlreadyProposal(msg.Sender.ID) {
@@ -212,6 +213,17 @@ func (le *Leader) giveFirstJob() {
     }
 
 }
+func (le *Leader) HandleNewNode(nodeid wendy.NodeID) {
+    le.debug("[HandleNewNode]")
+    msg := le.cluster.NewMessage(LEADER_VIC, nodeid, []byte{})
+    le.cluster.Send(msg)
+    aJobEntry := le.findAnUndoneJob()
+    if (aJobEntry == nil) {
+        return
+    }
+    jobIndex := aJobEntry.SeqNum
+    le.SendAnotherPieceToClient(jobIndex, nodeid)
+}
 func (le *Leader) ReceiveRequestForAnotherPiece(nodeid wendy.NodeID, seq int) {
     le.debug("[ReceiveRequestForAnotherPiece]")
     le.markNodeLastJobDone(nodeid.String(), seq)
@@ -234,6 +246,7 @@ func (le *Leader) markNodeLastJobDone(nodeid string, seq int) {
     le.lock.Unlock()
     le.updateToBackup(seq, nodeid, 1)
 }
+
 func (le *Leader) SendAnotherPieceToClient(jobIndex int, nodeid wendy.NodeID) {
     le.lock.RLock()
     jobentry := le.JobMap[jobIndex]
@@ -404,11 +417,16 @@ func (le *Leader) checkUpdateTimeStamp(uts int) bool{
 
 }
 
-
+func (le *Leader) GetActive() bool {
+    le.lock.RLock()
+    isac := le.isActive
+    le.lock.RUnlock()
+    return isac
+}
 func (le *Leader) SetActive() {
     le.debug("[SetActive]")
-    // le.lock.Lock()
-    // defer le.lock.Unlock()
+    le.lock.Lock()
+    defer le.lock.Unlock()
     le.isActive = true
 }
 

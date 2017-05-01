@@ -141,7 +141,6 @@ func (l *LeaderComm) ReceiveVictoryFromLeader(lid wendy.NodeID) {
     if (hasProposol) {
         aNewCrackProposal.wgElect.Done()
     }
-
 }
 func (l *LeaderComm) setNewLeader(lid wendy.NodeID) {
     l.debug("[setNewLeader]")
