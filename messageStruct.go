@@ -78,6 +78,7 @@ type CrackJobDetailsMessage struct {
 type InitializeBackUpMessage struct {
     ChosenProposerID   string       `json:"cid,omitempty"`
     BackUps            string       `json:"bu,omitempty"`
+    TheWholeJob        WholeJob     `json:"thj,omitempty"`
     JobMap             []JobEntry  `json:"jm,omitempty"`
 }
 type AskAnotherMessage struct {

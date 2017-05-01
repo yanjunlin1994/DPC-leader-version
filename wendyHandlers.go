@@ -142,14 +142,29 @@ func (app *WendyHandlers) OnDeliver(msg wendy.Message) {
 
 func (app *WendyHandlers) OnNodeJoin(node wendy.Node) {
 	fmt.Println("[Handler]Node joined: ", node.ID)
-    if (leader.GetActive()) {
-        fmt.Println("[Handler]Node joined. I am leader.")
+    if (leader.GetIsWorking()) {
+        fmt.Println("[Handler]Node joined. leader working")
         leader.HandleNewNode(node.ID)
     }
 }
 
 func (app *WendyHandlers) OnNodeExit(node wendy.Node) {
 	fmt.Println("[Handler]Node left: ", node.ID)
+    //Leader check whether it is working on a job, if yes, reset the job entry
+    if (leader.GetIsWorking()) {
+        fmt.Println("[Handler]Node left. leader working")
+        leader.HandleNodeLeft(node.ID)
+    }
+    //backup check whether it is leader died. if yes, become the next leader
+    if (node.ID.Equals(leaderComm.GetCurrentLeader())) && (leader.GetIsBackUp()) {
+        fmt.Println("[Handler]Leader left. Backup become leader")
+        leader.HandleNodeLeft(node.ID)
+        leaderComm.BecomeLeader()
+        leader.BackUpBecomeLeader()
+        leader.ContactBackup()
+        leaderComm.ProcessRequestToFormerLeader()
+    }
+
 }
 
 func (app *WendyHandlers) OnError(err error) {

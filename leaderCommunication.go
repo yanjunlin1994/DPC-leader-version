@@ -5,6 +5,8 @@ import (
     "log"
 	"./wendy-modified"
     "gopkg.in/mgo.v2/bson"
+    "strings"
+    "strconv"
 )
 const (
 	LogLevelDebug = iota
@@ -34,17 +36,17 @@ type CrackProposal struct {
     wgLeaderResponse   *sync.WaitGroup
 }
 type LeaderComm struct {
-	self               *wendy.Node
-    cluster            *wendy.Cluster
+	self                *wendy.Node
+    cluster             *wendy.Cluster
 	// lastHeardFrom      time.Time
-	Status             int
-    currentLeader      wendy.NodeID
-    ifLeader           bool  //if I am the leader
-    PendingProcessQueue    []string
+	Status              int
+    currentLeader       wendy.NodeID
+    ifLeader            bool  //if I am the leader
+    PendingProcessQueue []string
     // Leader             *Leader
-	lock               *sync.RWMutex
-    log                *log.Logger
-	logLevel           int
+	lock                *sync.RWMutex
+    log                 *log.Logger
+	logLevel            int
 }
 func NewCrackProposal() *CrackProposal {
     return &CrackProposal{
@@ -90,6 +92,7 @@ func (l *LeaderComm) tellLeaderIwantToCrack() bool {
     msg := l.cluster.NewMessage(WANT_TO_CRACK, l.currentLeader, nil)
     l.cluster.Send(msg)
     aNewCrackProposal.wgLeaderResponse.Wait()
+    hasProposol = false //reset the proposal to none
     if aNewCrackProposal.Status == ReceiveLeaderAgree {
         return true
     } else if aNewCrackProposal.Status == ReceiveLeaderDeny {
@@ -110,7 +113,8 @@ func (l *LeaderComm) SendCrackJobDetailsToLeader(hashtype string, hash string, p
     err = l.cluster.Send(msg)
     if err != nil {
         l.debug("[NotifyLeaderIStop] add to PendingProcessQueue")
-        l.PendingProcessQueue = append(l.PendingProcessQueue, "I_STOP")
+        pendingmsg := "CRACK_DETAIL," + hashtype + "," + hash + "," + strconv.Itoa(pwdlength)
+        l.PendingProcessQueue = append(l.PendingProcessQueue, pendingmsg)
     }
 }
 func (l *LeaderComm) ReceiveLeaderJudgement(ifAgree bool) {
@@ -128,7 +132,6 @@ func (l *LeaderComm) proposeElection() {
     LeaderID := cluster.GetFirstNodeID()
     if (l.self.ID.Equals(LeaderID)) {
         l.debug("[proposeElection] I am the leader! ")
-        aNewCrackProposal.wgElect.Done()
         l.BecomeLeader()
     } else {
         l.debug("[proposeElection] I am not the leader ")
@@ -141,14 +144,44 @@ func (l *LeaderComm) ReceiveVictoryFromLeader(lid wendy.NodeID) {
     if (hasProposol) {
         aNewCrackProposal.wgElect.Done()
     }
+    if (len(l.PendingProcessQueue) > 0) {
+        l.ProcessRequestToFormerLeader()
+    }
+
 }
 func (l *LeaderComm) setNewLeader(lid wendy.NodeID) {
     l.debug("[setNewLeader]")
     l.lock.Lock()
-    defer l.lock.Unlock()
     l.Status = Elected
     l.currentLeader = lid
     // l.lastHeardFrom = time.Now()
+    l.lock.Unlock()
+}
+func (l *LeaderComm) ProcessRequestToFormerLeader() {
+    l.lock.Lock()
+    for i := 0; i < len(l.PendingProcessQueue); i++ {
+        if (strings.Contains(l.PendingProcessQueue[i], "CRACK_DETAIL")) {
+            l.debug("======================[ProcessRequestToFormerLeader] crack detail unsent")
+            crackDetailArray := strings.Split(l.PendingProcessQueue[i], ",")
+            pwl, _ := strconv.Atoi(crackDetailArray[3])
+            l.SendCrackJobDetailsToLeader(crackDetailArray[1], crackDetailArray[2], pwl)
+            l.PendingProcessQueue[i] = ""
+        } else if (strings.Contains(l.PendingProcessQueue[i], "ASK_ANOTHER_PIECE")) {
+            l.debug("======================[ProcessRequestToFormerLeader] ask another piece unsent")
+            askDetailArray := strings.Split(l.PendingProcessQueue[i], ",")
+            seqn, _ := strconv.Atoi(askDetailArray[1])
+            l.GoAskLeaderANewPiece(seqn)
+            l.PendingProcessQueue[i] = ""
+        } else if (strings.Contains(l.PendingProcessQueue[i], "I_STOP")) {
+            l.debug("======================[ProcessRequestToFormerLeader] I stop unsent")
+            l.NotifyLeaderIStop()
+            l.PendingProcessQueue[i] = ""
+        } else {
+            return
+        }
+    }
+    l.lock.Unlock()
+
 }
 //notify the first node there is an election and you are the leader
 func (l *LeaderComm) notifyLeaderElection(lid wendy.NodeID) {
@@ -159,9 +192,11 @@ func (l *LeaderComm) notifyLeaderElection(lid wendy.NodeID) {
 }
 func (l *LeaderComm) BecomeLeader() {
     l.debug("[BecomeLeader]")
+    l.lock.Lock()
     l.Status = Elected
     l.currentLeader = l.self.ID
     l.ifLeader = true
+    l.lock.Unlock()
     l.broadcastVictory()
 }
 //Leader use this function to broadcast victory of election
@@ -176,10 +211,11 @@ func (l *LeaderComm) broadCastMessage(msgType byte, data []byte) {
         return
     }
     for _, nodeIterate := range nodes {
-        if !nodeIterate.ID.Equals(l.self.ID) {
-            msg := l.cluster.NewMessage(msgType, nodeIterate.ID, data)
-            l.cluster.Send(msg)
-        }
+        msg := l.cluster.NewMessage(msgType, nodeIterate.ID, data)
+        l.cluster.Send(msg)
+        // if !nodeIterate.ID.Equals(l.self.ID) {
+        //
+        // }
     }
 }
 func (l *LeaderComm) NotifyLeaderIStop() {
@@ -202,11 +238,14 @@ func (l *LeaderComm) GoAskLeaderANewPiece(Seqn int) {
     err = l.cluster.Send(msg)
     if err != nil {
         l.debug("[AskLeaderANewPiece] leader fail, add to PendingProcessQueue")
-        l.PendingProcessQueue = append(l.PendingProcessQueue, "ASK_ANOTHER_PIECE")
+        pendingmsg := "ASK_ANOTHER_PIECE," + strconv.Itoa(Seqn)
+        l.PendingProcessQueue = append(l.PendingProcessQueue, pendingmsg)
     }
 }
-func (l *LeaderComm) ProcessPendingProcessQueue() {
-
+func (l *LeaderComm) GetCurrentLeader() wendy.NodeID {
+    l.lock.RLock()
+	defer l.lock.RUnlock()
+    return l.currentLeader
 }
 func (l *LeaderComm) Test(format string, v ...interface{}) {
 	l.log.Printf(format, v...)

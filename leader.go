@@ -12,12 +12,12 @@ import (
     "os/exec"
 )
 const (
-    SPLIT_FOLD = 7
+    SPLIT_FOLD = 8
 )
 type WholeJob struct {
-    HashType           int
-    HashValue          string
-    Pwdlength          int
+    HashType           int          `json:"hashtp,omitempty"`
+    HashValue          string       `json:"hashvl,omitempty"`
+    Pwdlength          int          `json:"pwdl,omitempty"`
 }
 type JobEntry struct {
     SeqNum          int     `json:"seqn,omitempty"`
@@ -30,6 +30,7 @@ type JobEntry struct {
 type Leader struct {
     isActive           bool  //if I am the leader now, I am active. Otherwise not active
     isBackup           bool  //if I am the back up node for leader
+    IsWorking          bool
     BackUps            wendy.NodeID
 	self               *wendy.Node
     cluster            *wendy.Cluster
@@ -62,6 +63,7 @@ func NewLeader(self *wendy.Node, cluster *wendy.Cluster) *Leader {
 	return &Leader{
         isActive:           false,
         isBackup:           false,
+        IsWorking:          false,
         BackUps:            wendy.EmptyNodeID(),
 		self:               self,
         cluster:            cluster,
@@ -123,7 +125,7 @@ func (le *Leader) CheckCorrectProposer(id wendy.NodeID) bool{
 func (le *Leader) PreapreJob(HashType string, Hash string, Pwdlength int) error {
     keySpace, nodesCount := le.calculateKeySpace(HashType, Hash, Pwdlength)
     le.constructJobMap(keySpace, nodesCount)
-    le.contactBackup()
+    le.ContactBackup()
     le.giveFirstJob()
     return nil
 }
@@ -139,7 +141,10 @@ func (le *Leader) calculateKeySpace(HashType string, Hash string, Pwdlength int)
 	} else if (strings.EqualFold(HashType, "SHA256")) == true {
 		ht = 1400
 	}
+    le.lock.Lock()
     le.wholeJob = NewWholeJob(ht, Hash, Pwdlength)
+    le.IsWorking = true
+    le.lock.Unlock()
 
 	for i := 0; i < Pwdlength; i++ {
 		mask = mask + "?l"
@@ -173,11 +178,15 @@ func (le *Leader) constructJobMap(keySpace int, nodesCount int) error {
 }
 //just for debug
 func (le *Leader) printJobMap() {
+    le.lock.RLock()
+    defer le.lock.RUnlock()
+    le.debug(">>>>>>>>>>>>>>>")
     for _, job := range le.JobMap {
+
         le.debug(strconv.Itoa(job.SeqNum) + " " + strconv.Itoa(job.Start) + " " +
                     strconv.Itoa(job.End) + " " + job.Node + " " + strconv.Itoa(job.Status))
-
 	}
+    le.debug("<<<<<<<<<<<<<<<")
 }
 func (le *Leader) giveFirstJob() {
     nodes := le.cluster.GetListOfNodes()
@@ -223,6 +232,29 @@ func (le *Leader) HandleNewNode(nodeid wendy.NodeID) {
     }
     jobIndex := aJobEntry.SeqNum
     le.SendAnotherPieceToClient(jobIndex, nodeid)
+}
+func (le *Leader) HandleNodeLeft(nodeid wendy.NodeID) {
+    le.searchThisNodeUndoneWorkAndMarkUndone(nodeid.String())
+}
+func (le *Leader) searchThisNodeUndoneWorkAndMarkUndone(nodeid string) {
+    le.debug("[searchThisNodeUndoneWorkAndMarkUndone]")
+    le.lock.RLock()
+    var jobIndex int = -1
+    for i := 0; i < len(le.JobMap); i++ {
+        if (le.JobMap[i].Node == nodeid) && (le.JobMap[i].Status == 0) {
+            jobIndex = i
+            break
+        }
+    }
+    le.lock.RUnlock()
+    if (jobIndex != -1) {
+        le.debug("[searchThisNodeUndoneWorkAndMarkUndone] reset the entry")
+        le.lock.Lock()
+        le.debug("[searchThisNodeUndoneWorkAndMarkUndone] reset the entry lock acquire")
+        le.JobMap[jobIndex].Node = "none"
+        le.JobMap[jobIndex].Status = -1
+        le.lock.Unlock()
+    }
 }
 func (le *Leader) ReceiveRequestForAnotherPiece(nodeid wendy.NodeID, seq int) {
     le.debug("[ReceiveRequestForAnotherPiece]")
@@ -282,8 +314,8 @@ func (le *Leader) findAnUndoneJob() *JobEntry{
     le.debug("[findAnUndoneJob] no undone job")
     return nil
 }
-func (le *Leader) contactBackup() {
-    le.debug("[contactBackup]")
+func (le *Leader) ContactBackup() {
+    le.debug("[ContactBackup]")
     //----- chose one backup for now
     nodes := le.cluster.GetListOfNodes()
     if (len(nodes) < 2) {
@@ -295,7 +327,7 @@ func (le *Leader) contactBackup() {
         }
         var backupID wendy.NodeID
         backupID = nodeIterate.ID
-        payload := InitializeBackUpMessage{ChosenProposerID: le.chosenProposerID.String(), BackUps: backupID.String(), JobMap: le.JobMap}
+        payload := InitializeBackUpMessage{ChosenProposerID: le.chosenProposerID.String(), BackUps: backupID.String(), TheWholeJob: *(le.wholeJob), JobMap: le.JobMap}
         data, err := json.Marshal(payload)
         if err != nil {
             panic(err)
@@ -303,10 +335,11 @@ func (le *Leader) contactBackup() {
         message := le.cluster.NewMessage(INIT_BACKUP, backupID, data)
         err = le.cluster.Send(message)
         if err != nil {
-            le.debug("[contactBackup] This Backup candidate died, change")
+            le.debug("[ContactBackup] This Backup candidate died, change")
             continue
         } else {
             le.setBackup(backupID)
+            break
         }
     }
 }
@@ -336,6 +369,13 @@ func (le *Leader) BackUpUpdateBackUp(seqn int, nodeid string, stat int) {
     le.lock.Unlock()
     le.printJobMap()
 }
+func (le *Leader) BackUpBecomeLeader() {
+    le.lock.Lock()
+    le.isActive = true
+    le.isBackup = false
+    le.lock.Unlock()
+
+}
 func (le *Leader) findNewBackUp() {
 
 }
@@ -360,7 +400,9 @@ func (le *Leader) BackUpReceiveInitFromLeader(msg wendy.Message) {
     le.chosenProposerID, _ =  wendy.NodeIDFromBytes([]byte(newInitializeBackUpMessage.ChosenProposerID))
     le.BackUps, _ = wendy.NodeIDFromBytes([]byte(newInitializeBackUpMessage.BackUps))
     le.JobMap = newInitializeBackUpMessage.JobMap
-
+    le.wholeJob = NewWholeJob(newInitializeBackUpMessage.TheWholeJob.HashType,
+                                newInitializeBackUpMessage.TheWholeJob.HashValue,
+                                newInitializeBackUpMessage.TheWholeJob.Pwdlength)
     le.isBackup = true
     le.lock.Unlock()
     le.printJobMap()
@@ -416,18 +458,22 @@ func (le *Leader) checkUpdateTimeStamp(uts int) bool{
     return false
 
 }
-
-func (le *Leader) GetActive() bool {
+func (le *Leader) GetIsWorking() bool {
     le.lock.RLock()
-    isac := le.isActive
-    le.lock.RUnlock()
-    return isac
+	defer le.lock.RUnlock()
+    return le.IsWorking
 }
+func (le *Leader) GetIsBackUp() bool {
+    le.lock.RLock()
+	defer le.lock.RUnlock()
+    return le.isBackup
+}
+
 func (le *Leader) SetActive() {
     le.debug("[SetActive]")
     le.lock.Lock()
-    defer le.lock.Unlock()
     le.isActive = true
+    le.lock.Unlock()
 }
 
 func (le *Leader) debug(format string, v ...interface{}) {

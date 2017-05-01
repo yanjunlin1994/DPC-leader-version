@@ -87,7 +87,7 @@ func (j *Job) StartJob() {
     }
 }
 func (j *Job) SetStatus(s int) {
-    fmt.Println("[JOB] SetStatus: " + strconv.Itoa(s))
+    // fmt.Println("[JOB] SetStatus: " + strconv.Itoa(s))
     j.lock.Lock()
     j.Status = s
     j.lock.Unlock()

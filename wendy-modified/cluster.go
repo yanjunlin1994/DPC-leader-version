@@ -267,7 +267,19 @@ func (c *Cluster) Send(msg Message) error {
 	// }
 	err = c.send(msg, target)
 	if err == deadNodeError {
-		c.remove(target.ID)
+		// c.remove(target.ID)
+        exitmsg := c.NewMessage(NODE_EXIT, target.ID, []byte{})
+        snodes := c.Neighborhoodset.list()
+        for _, snode := range snodes {
+            c.debug("[Send] inform nodes someone exits")
+            err := c.send(exitmsg, snode)
+            if err != nil {
+                c.fanOutError(err)
+            }
+            // if !(snode.ID.Equals(c.self.ID)) {
+            //
+            // }
+        }
 	}
 	return err
 }
@@ -317,18 +329,21 @@ func (c *Cluster) sendHeartbeats() {
 		}
 		err := c.send(msg, node)
 		if err == deadNodeError {
-			err = c.remove(node.ID)
+			// err = c.remove(node.ID)
 			if err != nil {
 				c.fanOutError(err)
 			}
             exitmsg := c.NewMessage(NODE_EXIT, node.ID, []byte{})
             snodes := c.Neighborhoodset.list()
         	for _, snode := range snodes {
-                c.debug("[sendHeartbeats] have removed node in my set, now inform other nodes")
-        		err := c.send(exitmsg, snode)
-        		if err != nil {
-        			c.fanOutError(err)
-        		}
+                c.debug("[sendHeartbeats] inform nodes exit")
+                err := c.send(exitmsg, snode)
+                if err != nil {
+                    c.fanOutError(err)
+                }
+                // if !(snode.ID.Equals(c.self.ID)) {
+                //
+                // }
         	}
 			continue
 		}
@@ -400,6 +415,12 @@ func (c *Cluster) deliverUpdateBackUpFromLeader(msg Message) {
 	for _, app := range c.applications {
 		app.OnBackUpRecvUpdate(msg)
 	}
+}
+func (c *Cluster) deliverNodeDontWantToWorkFromClient(msg Message) {
+    c.debug("[deliverNodeDontWantToWorkFromClient]")
+    for _, app := range c.applications {
+        app.OnNodeExit(msg.Sender)
+    }
 }
 
 
@@ -522,6 +543,8 @@ func (c *Cluster) handleClient(conn net.Conn) {
         c.deliverFoundPass(msg)
     case UPDATE_BACKUP:
         c.deliverUpdateBackUpFromLeader(msg)
+    case I_STOP:
+        c.deliverNodeDontWantToWorkFromClient(msg)
 	default:
         c.debug("DANGEROUS")
 		c.onMessageReceived(msg)
@@ -938,13 +961,21 @@ func (c *Cluster) announcePresence() error {
 		// msg.RTVersion = node.routingTableVersion
 		msg.NSVersion = node.neighborhoodSetVersion
 		err := c.send(msg, node)
-		if err == deadNodeError {
-			err = c.remove(node.ID)
-			if err != nil {
-				c.fanOutError(err)
-			}
-			continue
-		}
+        if err == deadNodeError {
+    		// c.remove(target.ID)
+            exitmsg := c.NewMessage(NODE_EXIT, node.ID, []byte{})
+            snodes := c.Neighborhoodset.list()
+            for _, snode := range snodes {
+                c.debug("[announcePresence] inform nodes someone exit")
+                err := c.send(exitmsg, snode)
+                if err != nil {
+                    c.fanOutError(err)
+                }
+                // if !(snode.ID.Equals(c.self.ID)) {
+                //
+                // }
+            }
+    	}
 		sent[node.ID] = true
 	}
 	c.lock.Lock()
@@ -1108,12 +1139,15 @@ func (c *Cluster) remove(id NodeID) error {
     if node == nil {
         c.debug("[remove] removed this node before already. ")
         return nil
+    } else {
+        for _, app := range c.applications {
+    		c.debug("[remove]sending handler node exit.")
+    		app.OnNodeExit(*node)
+    		c.debug("[remove]sent handler node exit.")
+    	}
+
     }
-	for _, app := range c.applications {
-		c.debug("[remove]sending handler node exit.")
-		app.OnNodeExit(*node)
-		c.debug("[remove]sent handler node exit.")
-	}
+
 	return nil
 }
 // get the node from the Neighborhoodset according to node ID
