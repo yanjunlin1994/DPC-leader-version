@@ -48,6 +48,7 @@ const (
 )
 const (
     INIT_BACKUP = 90
+    UPDATE_BACKUP = 91
 )
 // String returns a string representation of a message.
 func (m *Message) String() string {

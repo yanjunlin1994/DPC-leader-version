@@ -30,6 +30,7 @@ const (
 )
 const (
     INIT_BACKUP = 90
+    UPDATE_BACKUP = 91
 )
 // Struct for new job message
 
@@ -81,6 +82,11 @@ type InitializeBackUpMessage struct {
 }
 type AskAnotherMessage struct {
 	SeqNum  int
+}
+type UpdateBackUpMessage struct {
+	SeqNum  int
+    NodeiD  string
+    Status  int
 }
 
 // Struct for block cluster message

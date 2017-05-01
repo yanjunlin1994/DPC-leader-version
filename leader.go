@@ -202,6 +202,7 @@ func (le *Leader) giveFirstJob() {
             le.JobMap[i].Node = nodeIterate.ID.String()
             le.JobMap[i].Status = 0
             le.debug("[giveFirstJob] send to " + le.JobMap[i].Node)
+            le.updateToBackup(i, le.JobMap[i].Node, 0)
             i++
         }
         // if !nodeIterate.ID.Equals(le.self.ID) {
@@ -213,7 +214,7 @@ func (le *Leader) giveFirstJob() {
 }
 func (le *Leader) ReceiveRequestForAnotherPiece(nodeid wendy.NodeID, seq int) {
     le.debug("[ReceiveRequestForAnotherPiece]")
-    le.markNodeLastJobDone(seq)
+    le.markNodeLastJobDone(nodeid.String(), seq)
     aJobEntry := le.findAnUndoneJob()
     if (aJobEntry == nil) {
         return
@@ -226,11 +227,12 @@ func (le *Leader) ReceiveRequestForAnotherPiece(nodeid wendy.NodeID, seq int) {
     le.lock.Unlock()
     le.SendAnotherPieceToClient(jobIndex, nodeid)
 }
-func (le *Leader) markNodeLastJobDone(seq int) {
+func (le *Leader) markNodeLastJobDone(nodeid string, seq int) {
     le.debug("[markNodeLastJobDone] was " + strconv.Itoa(seq))
     le.lock.Lock()
     le.JobMap[seq].Status = 1
     le.lock.Unlock()
+    le.updateToBackup(seq, nodeid, 1)
 }
 func (le *Leader) SendAnotherPieceToClient(jobIndex int, nodeid wendy.NodeID) {
     le.lock.RLock()
@@ -252,6 +254,7 @@ func (le *Leader) SendAnotherPieceToClient(jobIndex int, nodeid wendy.NodeID) {
         le.JobMap[jobIndex].Node = nodeid.String()
         le.JobMap[jobIndex].Status = 0
         le.lock.Unlock()
+        le.updateToBackup(jobIndex, nodeid.String(), 0)
     }
     le.printJobMap()
 }
@@ -294,8 +297,33 @@ func (le *Leader) contactBackup() {
         }
     }
 }
-func (le *Leader) updateToBackup() {
+func (le *Leader) updateToBackup(seqn int, nodeid string, stat int) {
+    le.increaseUpdateTimeStamp()
+    le.debug("[updateToBackup]")
 
+    payload := UpdateBackUpMessage{SeqNum: seqn,
+                                   NodeiD: nodeid,
+                                   Status: stat}
+    data, err := bson.Marshal(payload)
+    if err != nil {
+        panic(err)
+    }
+    msg := le.cluster.NewMessage(UPDATE_BACKUP, le.BackUps, data)
+    err = le.cluster.Send(msg)
+    if err != nil {
+        le.debug("[updateToBackup] backup failse")
+        le.findNewBackUp()
+    }
+}
+func (le *Leader) BackUpUpdateBackUp(seqn int, nodeid string, stat int) {
+    le.debug("[BackUpUpdateBackUp]")
+    le.lock.Lock()
+    le.JobMap[seqn].Node = nodeid
+    le.JobMap[seqn].Status = stat
+    le.lock.Unlock()
+    le.printJobMap()
+}
+func (le *Leader) findNewBackUp() {
 
 }
 func (le *Leader) removeBackUp() {
@@ -361,11 +389,7 @@ func (le *Leader) replaceBackup() {
 
 
 }
-func (le *Leader) UpdateToBackUp() {
-    le.debug("[UpdateToBackUp]")
-    le.increaseUpdateTimeStamp()
-    //should update leader status to back up
-}
+
 func (le *Leader) increaseRoutineTimeStamp() {
     le.routineTimeStamp++
 }

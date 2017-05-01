@@ -41,6 +41,7 @@ type Application interface {
     OnReceiveFoundPass(msg Message)
     OnAskAnotherPiece(msg Message)
     OnRecvAnotherPiece(msg Message)
+    OnBackUpRecvUpdate(msg Message)
 }
 
 

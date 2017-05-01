@@ -395,6 +395,13 @@ func (c *Cluster) deliverRecvAnotherPieceFromLeader(msg Message) {
 		app.OnRecvAnotherPiece(msg)
 	}
 }
+func (c *Cluster) deliverUpdateBackUpFromLeader(msg Message) {
+    c.debug("[deliverUpdateBackUpFromLeader]")
+	for _, app := range c.applications {
+		app.OnBackUpRecvUpdate(msg)
+	}
+}
+
 
 //initiate workmateset using current neighborhoodset
 // func (c *Cluster) initWorkMateSet() {
@@ -513,6 +520,8 @@ func (c *Cluster) handleClient(conn net.Conn) {
         c.deliverRecvAnotherPieceFromLeader(msg)
     case FOUND_PASS:
         c.deliverFoundPass(msg)
+    case UPDATE_BACKUP:
+        c.deliverUpdateBackUpFromLeader(msg)
 	default:
         c.debug("DANGEROUS")
 		c.onMessageReceived(msg)

@@ -207,7 +207,7 @@ func (j *Job) Stop() {
         fmt.Print(err)
     }
     j.SetStatus(Inactive)
-    j.notifyLeaderStop()
+    j.GracefulStop()
 }
 func (j *Job) killHashCat() error {
     fmt.Println("[JOB] killHashCat")

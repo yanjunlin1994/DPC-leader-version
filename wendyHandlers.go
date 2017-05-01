@@ -117,6 +117,15 @@ func (app *WendyHandlers) OnRecvAnotherPiece(msg wendy.Message) {
                 strconv.Itoa(newJob.Start) + " end: " + strconv.Itoa(newJob.End))
     go job.StartJob()
 }
+func (app *WendyHandlers) OnBackUpRecvUpdate(msg wendy.Message) {
+    fmt.Println("[Handler] On BackUp RecvUpdate, from Leader")
+    newUpdate := &UpdateBackUpMessage{}
+    err := bson.Unmarshal(msg.Value, newUpdate)
+    if err != nil {
+        panic(err)
+    }
+    leader.BackUpUpdateBackUp(newUpdate.SeqNum, newUpdate.NodeiD, newUpdate.Status)
+}
 func (app *WendyHandlers) OnDeliver(msg wendy.Message) {
 	fmt.Println("[Handler][OnDeliver] Message purpose is: ", msg.Purpose)
 	switch p := msg.Purpose; p {
