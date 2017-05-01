@@ -184,16 +184,23 @@ func (l *LeaderComm) broadCastMessage(msgType byte, data []byte) {
     }
 }
 func (l *LeaderComm) NotifyLeaderIStop() {
-    msg := l.cluster.NewMessage(I_STOP, l.currentLeader, nil)
+    msg := l.cluster.NewMessage(I_STOP, l.currentLeader, []byte{})
     err := l.cluster.Send(msg)
     if err != nil {
         l.debug("[NotifyLeaderIStop] add to PendingProcessQueue")
         l.PendingProcessQueue = append(l.PendingProcessQueue, "I_STOP")
     }
 }
-func (l *LeaderComm) AskLeaderANewPiece() {
-    msg := l.cluster.NewMessage(ASK_ANOTHER_PIECE, l.currentLeader, nil)
-    err := l.cluster.Send(msg)
+func (l *LeaderComm) GoAskLeaderANewPiece(Seqn int) {
+    // l.debug("[AskLeaderANewPiece]")
+    l.debug("[AskLeaderANewPiece] leader is " + l.currentLeader.String())
+    payload := AskAnotherMessage{SeqNum: Seqn}
+    data, err := bson.Marshal(payload)
+    if err != nil {
+        panic(err)
+    }
+    msg := l.cluster.NewMessage(ASK_ANOTHER_PIECE, l.currentLeader, data)
+    err = l.cluster.Send(msg)
     if err != nil {
         l.debug("[AskLeaderANewPiece] leader fail, add to PendingProcessQueue")
         l.PendingProcessQueue = append(l.PendingProcessQueue, "ASK_ANOTHER_PIECE")

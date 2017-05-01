@@ -77,13 +77,13 @@ func (app *WendyHandlers) OnFirstJob(msg wendy.Message) {
     if err != nil {
         panic(err)
     }
-    fmt.Println("[Handler] OnFirstJob type: " + strconv.Itoa(newJob.HashType) +
+    fmt.Println("[Handler] OnFirstJob No." + strconv.Itoa(newJob.SeqNum) +" type: " + strconv.Itoa(newJob.HashType) +
                 " hashvalue: " + newJob.HashValue + " length: " +
                 strconv.Itoa(newJob.Pwdlength) + " start: " +
                 strconv.Itoa(newJob.Start) + " end: " + strconv.Itoa(newJob.End))
 
-    job = NewJob(selfnode, cluster, leaderComm, newJob.HashType, newJob.HashValue,
-                newJob.Pwdlength, newJob.Start, (newJob.End - newJob.Start))
+    job = NewJob(selfnode, cluster, leaderComm, newJob.SeqNum, newJob.HashType,
+    newJob.HashValue, newJob.Pwdlength, newJob.Start, (newJob.End - newJob.Start))
     go job.StartJob()
 
 }
@@ -92,9 +92,30 @@ func (app *WendyHandlers) OnReceiveFoundPass(msg wendy.Message) {
     job.ReceiveFoundPass(msg)
 }
 func (app *WendyHandlers) OnAskAnotherPiece(msg wendy.Message) {
-    fmt.Println("[Handler] OnAskAnotherPiece")
-    // leader.ReceiveRequestForAnotherPiece(msg.Sender.ID)
+    fmt.Println("[Handler] OnAskAnotherPiece, from client")
+    askJob := &AskAnotherMessage{}
+    err := bson.Unmarshal(msg.Value, askJob)
+    if err != nil {
+        panic(err)
+    }
+    leader.ReceiveRequestForAnotherPiece(msg.Sender.ID, askJob.SeqNum)
 
+}
+func (app *WendyHandlers) OnRecvAnotherPiece(msg wendy.Message) {
+    fmt.Println("[Handler] OnRecvAnotherPiece, from Leader")
+    newJob := &NewJobMessage{}
+    err := bson.Unmarshal(msg.Value, newJob)
+    if err != nil {
+        panic(err)
+    }
+    job = NewJob(selfnode, cluster, leaderComm, newJob.SeqNum, newJob.HashType,
+    newJob.HashValue, newJob.Pwdlength, newJob.Start, (newJob.End - newJob.Start))
+    fmt.Println("[Handler] Another Piece No." + strconv.Itoa(newJob.SeqNum) +
+                " type: " + strconv.Itoa(newJob.HashType) +
+                " hashvalue: " + newJob.HashValue + " length: " +
+                strconv.Itoa(newJob.Pwdlength) + " start: " +
+                strconv.Itoa(newJob.Start) + " end: " + strconv.Itoa(newJob.End))
+    go job.StartJob()
 }
 func (app *WendyHandlers) OnDeliver(msg wendy.Message) {
 	fmt.Println("[Handler][OnDeliver] Message purpose is: ", msg.Purpose)

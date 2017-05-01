@@ -15,6 +15,7 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/hex"
+    "sync"
 )
 
 const (
@@ -30,6 +31,7 @@ type Job struct {
     self        *wendy.Node
     cluster     *wendy.Cluster
     leaderComm  *LeaderComm
+    SeqNum      int
 	HashType    int // Type of hash (int)
 	HashValue   string // Hash value
 	Length      int
@@ -38,6 +40,7 @@ type Job struct {
     Status      int
     Outfile     string
     HashcatJob  *exec.Cmd
+    lock        *sync.RWMutex
 }
 // String returns a string representation of a message.
 func (j *Job) String() string {
@@ -45,11 +48,13 @@ func (j *Job) String() string {
 }
 
 func NewJob(self *wendy.Node, cluster *wendy.Cluster,
-                    leaderComm *LeaderComm,
+                    leaderComm *LeaderComm, seqn int,
                     Hasht int, Hashv string, Len int, St int, Lm int) *Job {
 	return &Job{
         self:          self,
         cluster:       cluster,
+        leaderComm:    leaderComm,
+        SeqNum:        seqn,
         HashType:      Hasht,
     	HashValue:     Hashv,
     	Length:        Len,
@@ -58,6 +63,7 @@ func NewJob(self *wendy.Node, cluster *wendy.Cluster,
         Status:        Inactive,
         Outfile:       self.ID.String()+ ".txt",
         HashcatJob:    nil,
+        lock:          new(sync.RWMutex),
 
 	}
 }
@@ -82,7 +88,9 @@ func (j *Job) StartJob() {
 }
 func (j *Job) SetStatus(s int) {
     fmt.Println("[JOB] SetStatus: " + strconv.Itoa(s))
+    j.lock.Lock()
     j.Status = s
+    j.lock.Unlock()
 }
 func (j *Job) startCrack() int {
     app := "./hashcat-3.5.0/hashcat"
@@ -134,7 +142,7 @@ func (j *Job) startCrack() int {
 			case "exit status -1":
 				fmt.Println("[JOB] Hashcat error (with arguments, inputs, inputfiles etc.)!")
 			default :
-				fmt.Println("[JOB] Error running hashcat")
+				fmt.Println("[JOB] kill hashcat process")
 		}
 		return -1
 	}
@@ -189,7 +197,7 @@ func (j *Job) announceFound(foundPassword string) {
 func (j *Job) askLeaderANewPiece() {
     if (j.Status != Found) {
         fmt.Println("[JOB] Ask leader for a new piece")
-        j.leaderComm.AskLeaderANewPiece()
+        j.leaderComm.GoAskLeaderANewPiece(j.SeqNum)
     }
 
 }
@@ -215,7 +223,7 @@ func (j *Job) killHashCat() error {
     j.HashcatJob = nil
     return nil
 }
-func (j *Job) notifyLeaderStop() {
+func (j *Job) GracefulStop() {
     j.leaderComm.NotifyLeaderIStop()
 }
 func (j *Job) ReceiveFoundPass(msg wendy.Message) {

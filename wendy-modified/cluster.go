@@ -309,7 +309,7 @@ func (c *Cluster) fanOutError(err error) {
 
 func (c *Cluster) sendHeartbeats() {
 	msg := c.NewMessage(HEARTBEAT, c.self.ID, []byte{})
-    nodes := c.Neighborhoodset.heartbeatReceivers()
+    nodes := c.Neighborhoodset.HeartbeatReceivers()
 
 	for _, node := range nodes {
 		if node == nil {
@@ -383,12 +383,19 @@ func (c *Cluster) deliverFoundPass(msg Message) {
 		app.OnReceiveFoundPass(msg)
 	}
 }
-func (c *Cluster) deliverAskAnotherPiece(msg Message) {
-    c.debug("[deliverAskLeaderAnotherPiece]")
+func (c *Cluster) deliverAskAnotherPieceFromClient(msg Message) {
+    c.debug("[deliverAskAnotherPieceFromClient]")
 	for _, app := range c.applications {
 		app.OnAskAnotherPiece(msg)
 	}
 }
+func (c *Cluster) deliverRecvAnotherPieceFromLeader(msg Message) {
+    c.debug("[deliverRecvAnotherPieceFromLeader]")
+	for _, app := range c.applications {
+		app.OnRecvAnotherPiece(msg)
+	}
+}
+
 //initiate workmateset using current neighborhoodset
 // func (c *Cluster) initWorkMateSet() {
 //     c.debug("[initWorkMateSet] initiating working set")
@@ -501,7 +508,9 @@ func (c *Cluster) handleClient(conn net.Conn) {
     case FIRST_JOB:
         c.deliverFirstJobFromLeader(msg)
     case ASK_ANOTHER_PIECE:
-        c.deliverAskAnotherPiece(msg)
+        c.deliverAskAnotherPieceFromClient(msg)
+    case GIVE_ANOTHER_PIECE:
+        c.deliverRecvAnotherPieceFromLeader(msg)
     case FOUND_PASS:
         c.deliverFoundPass(msg)
 	default:
@@ -760,7 +769,7 @@ func (c *Cluster) onStateReceived(msg Message) {
 		return
 	}
 
-	c.debug("[onStateReceived]State received. EOL is %v, isJoined is %v.", state.EOL, c.isJoined())
+	// c.debug("[onStateReceived]State received. EOL is %v, isJoined is %v.", state.EOL, c.isJoined())
 	if !c.isJoined() && state.EOL {
 		// c.debug("[onStateReceived]Haven't announced presence yet... %d seconds", waitTime)
 		// time.Sleep(time.Duration(waitTime) * time.Second)

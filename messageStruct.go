@@ -25,7 +25,8 @@ const (
 const (
     FIRST_JOB = 70
     ASK_ANOTHER_PIECE = 71
-    I_STOP = 72
+    GIVE_ANOTHER_PIECE = 72
+    I_STOP = 73
 )
 const (
     INIT_BACKUP = 90
@@ -54,6 +55,7 @@ type StopJobMessage struct {
 
 
 type NewJobMessage struct {
+    SeqNum        int
 	HashType      int
 	HashValue     string
 	Pwdlength     int
@@ -77,7 +79,9 @@ type InitializeBackUpMessage struct {
     BackUps            string       `json:"bu,omitempty"`
     JobMap             []JobEntry  `json:"jm,omitempty"`
 }
-
+type AskAnotherMessage struct {
+	SeqNum  int
+}
 
 // Struct for block cluster message
 // type BlockClusterMessage struct {

@@ -43,7 +43,8 @@ const (
 const (
     FIRST_JOB = 70
     ASK_ANOTHER_PIECE = 71
-    I_STOP = 72
+    GIVE_ANOTHER_PIECE = 72
+    I_STOP = 73
 )
 const (
     INIT_BACKUP = 90

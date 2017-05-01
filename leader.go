@@ -11,6 +11,9 @@ import (
     "strconv"
     "os/exec"
 )
+const (
+    SPLIT_FOLD = 7
+)
 type WholeJob struct {
     HashType           int
     HashValue          string
@@ -23,13 +26,7 @@ type JobEntry struct {
     Node            string  `json:"nd,omitempty"`
     Status          int     `json:"stt,omitempty"`
 }
-// type JobEntry struct {
-//     SeqNum          int
-//     Start           int
-//     End             int
-//     Node            string
-//     Status          int
-// }
+
 type Leader struct {
     isActive           bool  //if I am the leader now, I am active. Otherwise not active
     isBackup           bool  //if I am the back up node for leader
@@ -155,7 +152,7 @@ func (le *Leader) calculateKeySpace(HashType string, Hash string, Pwdlength int)
     return keySpace, nodesCount
 }
 func (le *Leader) constructJobMap(keySpace int, nodesCount int) error {
-	limit := keySpace / (2 * nodesCount)
+	limit := keySpace / (SPLIT_FOLD * nodesCount)
     pos := 0
     seq := 0
     for {
@@ -168,6 +165,7 @@ func (le *Leader) constructJobMap(keySpace int, nodesCount int) error {
         le.JobMap = append(le.JobMap, *aJobEntry)
 
         pos = pos + limit
+        seq++
     }
     le.printJobMap()
     return nil
@@ -188,7 +186,8 @@ func (le *Leader) giveFirstJob() {
     i := 0
     for _, nodeIterate := range nodes {
         jobentry := le.JobMap[i]
-        payload := NewJobMessage{HashType: le.wholeJob.HashType,
+        payload := NewJobMessage{SeqNum: jobentry.SeqNum,
+                                 HashType: le.wholeJob.HashType,
                                  HashValue: le.wholeJob.HashValue,
                                  Pwdlength: le.wholeJob.Pwdlength,
                                  Start: jobentry.Start,
@@ -197,9 +196,11 @@ func (le *Leader) giveFirstJob() {
         msg := le.cluster.NewMessage(FIRST_JOB, nodeIterate.ID, data)
         err = le.cluster.Send(msg)
         if (err != nil) {
+            le.debug("[giveFirstJob] This node died couldn't send ")
             continue
         } else {
             le.JobMap[i].Node = nodeIterate.ID.String()
+            le.JobMap[i].Status = 0
             le.debug("[giveFirstJob] send to " + le.JobMap[i].Node)
             i++
         }
@@ -210,30 +211,101 @@ func (le *Leader) giveFirstJob() {
     }
 
 }
+func (le *Leader) ReceiveRequestForAnotherPiece(nodeid wendy.NodeID, seq int) {
+    le.debug("[ReceiveRequestForAnotherPiece]")
+    le.markNodeLastJobDone(seq)
+    aJobEntry := le.findAnUndoneJob()
+    if (aJobEntry == nil) {
+        return
+    }
+    jobIndex := aJobEntry.SeqNum
+    le.debug("[ReceiveRequestForAnotherPiece] give it No." + strconv.Itoa(jobIndex))
+    le.lock.Lock()
+    le.JobMap[jobIndex].Node = nodeid.String()
+    le.JobMap[jobIndex].Status = 0
+    le.lock.Unlock()
+    le.SendAnotherPieceToClient(jobIndex, nodeid)
+}
+func (le *Leader) markNodeLastJobDone(seq int) {
+    le.debug("[markNodeLastJobDone] was " + strconv.Itoa(seq))
+    le.lock.Lock()
+    le.JobMap[seq].Status = 1
+    le.lock.Unlock()
+}
+func (le *Leader) SendAnotherPieceToClient(jobIndex int, nodeid wendy.NodeID) {
+    le.lock.RLock()
+    jobentry := le.JobMap[jobIndex]
+    payload := NewJobMessage{SeqNum: jobentry.SeqNum,
+                             HashType: le.wholeJob.HashType,
+                             HashValue: le.wholeJob.HashValue,
+                             Pwdlength: le.wholeJob.Pwdlength,
+                             Start: jobentry.Start,
+                             End:   jobentry.End}
+    le.lock.RUnlock()
+    data, err := bson.Marshal(payload)
+    msg := le.cluster.NewMessage(GIVE_ANOTHER_PIECE, nodeid, data)
+    err = le.cluster.Send(msg)
+    if (err != nil) {
+        return
+    } else {
+        le.lock.Lock()
+        le.JobMap[jobIndex].Node = nodeid.String()
+        le.JobMap[jobIndex].Status = 0
+        le.lock.Unlock()
+    }
+    le.printJobMap()
+}
+func (le *Leader) findAnUndoneJob() *JobEntry{
+    le.lock.RLock()
+    defer le.lock.RUnlock()
+    for i := 0; i < len(le.JobMap); i++ {
+        if (le.JobMap[i].Status == -1) {
+            return &(le.JobMap[i])
+        }
+	}
+    le.debug("[findAnUndoneJob] no undone job")
+    return nil
+}
 func (le *Leader) contactBackup() {
-    //TODO: if can't contact, use another node
     le.debug("[contactBackup]")
     //----- chose one backup for now
-    var backupID wendy.NodeID
-    backupID = le.chosenProposerID
-    le.setBackup(backupID)
-    payload := InitializeBackUpMessage{ChosenProposerID: le.chosenProposerID.String(), BackUps: backupID.String(), JobMap: le.JobMap}
-    data, err := json.Marshal(payload)
-    if err != nil {
-        panic(err)
+    nodes := le.cluster.GetListOfNodes()
+    if (len(nodes) < 2) {
+        return
     }
-    message := le.cluster.NewMessage(INIT_BACKUP, le.BackUps, data)
-    err = le.cluster.Send(message)
-    if err != nil {
-        panic(err.Error())
+    for _, nodeIterate := range nodes {
+        if (nodeIterate.ID.Equals(le.self.ID)) {
+            continue
+        }
+        var backupID wendy.NodeID
+        backupID = nodeIterate.ID
+        payload := InitializeBackUpMessage{ChosenProposerID: le.chosenProposerID.String(), BackUps: backupID.String(), JobMap: le.JobMap}
+        data, err := json.Marshal(payload)
+        if err != nil {
+            panic(err)
+        }
+        message := le.cluster.NewMessage(INIT_BACKUP, backupID, data)
+        err = le.cluster.Send(message)
+        if err != nil {
+            le.debug("[contactBackup] This Backup candidate died, change")
+            continue
+        } else {
+            le.setBackup(backupID)
+        }
     }
+}
+func (le *Leader) updateToBackup() {
+
 
 }
 func (le *Leader) removeBackUp() {
 
 }
+
 func (le *Leader) setBackup(bid wendy.NodeID) {
+    le.lock.Lock()
     le.BackUps = bid
+    le.lock.Unlock()
 }
 //unmarshall
 func (le *Leader) BackUpReceiveInitFromLeader(msg wendy.Message) {
@@ -284,10 +356,7 @@ func (le *Leader) getTotoalKeySpace(mask string) int {
 	return keySpace
 }
 
-func (le *Leader) updateToBackup() {
 
-
-}
 func (le *Leader) replaceBackup() {
 
 

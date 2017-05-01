@@ -40,7 +40,9 @@ type Application interface {
     OnFirstJob(msg Message)
     OnReceiveFoundPass(msg Message)
     OnAskAnotherPiece(msg Message)
+    OnRecvAnotherPiece(msg Message)
 }
+
 
 // Credentials is an interface that can be fulfilled to limit access to the Cluster.
 type Credentials interface {
