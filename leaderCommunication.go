@@ -135,13 +135,19 @@ func (l *LeaderComm) ReceiveLeaderJudgement(ifAgree bool) {
 //propose an election and return the leader ID
 func (l *LeaderComm) proposeElection() {
     l.debug("[proposeElection]")
-    LeaderID := cluster.GetFirstNodeID()
-    if (l.self.ID.Equals(LeaderID)) {
-        l.debug("[proposeElection] I am the leader! ")
-        l.BecomeLeader()
-    } else {
-        l.debug("[proposeElection] I am not the leader ")
-        l.notifyLeaderElection(LeaderID)
+    for {
+        LeaderID := cluster.GetFirstNodeID()
+        if (l.self.ID.Equals(LeaderID)) {
+            l.debug("[proposeElection] I am the leader! ")
+            l.BecomeLeader()
+            break
+        } else {
+            l.debug("[proposeElection] I am not the leader ")
+            succ := l.notifyLeaderElection(LeaderID)
+            if succ == true {
+                break
+            }
+        }
     }
 }
 func (l *LeaderComm) ReceiveVictoryFromLeader(lid wendy.NodeID) {
@@ -190,11 +196,15 @@ func (l *LeaderComm) ProcessRequestToFormerLeader() {
 
 }
 //notify the first node there is an election and you are the leader
-func (l *LeaderComm) notifyLeaderElection(lid wendy.NodeID) {
+func (l *LeaderComm) notifyLeaderElection(lid wendy.NodeID) bool {
     l.debug("[notifyLeaderElection]")
     l.Status = WaitLeaderVictory
     msg := l.cluster.NewMessage(YOU_ARE_LEADER, lid, nil)
-    l.cluster.Send(msg)
+    err := l.cluster.Send(msg)
+    if err != nil {
+        return false
+    }
+    return true
 }
 func (l *LeaderComm) BecomeLeader() {
     l.debug("[BecomeLeader]")

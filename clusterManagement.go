@@ -37,7 +37,7 @@ func ClusterManagement(option int) {
 
 	var credentials wendy.Passphrase = wendy.Passphrase(fileContents)
 
-	var heartbeatFreq int = 60
+	var heartbeatFreq int = 30
 	var entryNodeIP string
 
 	//var entryNodeIPs []string
@@ -95,7 +95,7 @@ func ClusterManagement(option int) {
 		cluster.Join(entryNodeIP, entryNodePort)
 	}
 
-	fmt.Println("[ClusterManagement] Cluster configuration done.")
+	// fmt.Println("[ClusterManagement] Cluster configuration done.")
 
 }
 

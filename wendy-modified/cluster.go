@@ -230,7 +230,7 @@ func (c *Cluster) Listen() error {
 		}
 	}(ln, connections)
     go func() {
-        c.debug("[Listen]spin heartbeat thread")
+        // c.debug("[Listen]spin heartbeat thread")
 		for {
             c.debug("[Listen]Send heartbeat")
             c.sendHeartbeats()
