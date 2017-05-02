@@ -31,6 +31,7 @@ type Leader struct {
     isActive           bool  //if I am the leader now, I am active. Otherwise not active
     isBackup           bool  //if I am the back up node for leader
     IsWorking          bool
+    IsDone             bool
     BackUps            wendy.NodeID
 	self               *wendy.Node
     cluster            *wendy.Cluster
@@ -64,6 +65,7 @@ func NewLeader(self *wendy.Node, cluster *wendy.Cluster) *Leader {
         isActive:           false,
         isBackup:           false,
         IsWorking:          false,
+        IsDone:             false,
         BackUps:            wendy.EmptyNodeID(),
 		self:               self,
         cluster:            cluster,
@@ -224,6 +226,9 @@ func (le *Leader) giveFirstJob() {
 }
 func (le *Leader) HandleNewNode(nodeid wendy.NodeID) {
     le.debug("[HandleNewNode]")
+    if (le.IsDone) {
+        return
+    }
     msg := le.cluster.NewMessage(LEADER_VIC, nodeid, []byte{})
     le.cluster.Send(msg)
     aJobEntry := le.findAnUndoneJob()
@@ -468,7 +473,17 @@ func (le *Leader) GetIsBackUp() bool {
 	defer le.lock.RUnlock()
     return le.isBackup
 }
-
+func (le *Leader) GetIsDone() bool {
+    le.lock.RLock()
+	defer le.lock.RUnlock()
+    return le.IsDone
+}
+func (le *Leader) SetDone() {
+    le.debug("[SetActive]")
+    le.lock.Lock()
+    le.IsDone = true
+    le.lock.Unlock()
+}
 func (le *Leader) SetActive() {
     le.debug("[SetActive]")
     le.lock.Lock()

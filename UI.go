@@ -8,7 +8,7 @@ import (
 	"os/signal"
     "strconv"
 )
-
+// var wgJobAppear sync.WaitGroup
 func main() {
     exitfix := make(chan os.Signal, 1)
 	signal.Notify(exitfix, os.Interrupt)
@@ -23,6 +23,9 @@ func main() {
     ClusterManagementEntrance(userChoice)
     myRole := AskForWhatToDo()
     WhatToDoEntrance(myRole)
+    // wgJobAppear.Add(1)
+    // wgJobAppear.Wait()
+    // AskWhetherStop()
     select{}
     //WAHT IS NEXT STEP? MAYBE STATUS
 }
@@ -72,6 +75,15 @@ func AskForWhatToDo() string{
     }
     return role
 }
+// func AskWhetherStop() string{
+//     st := ""
+//     fmt.Println("If you want to stop, type stop")
+//     fmt.Scanf("%s\n", &st)
+//     if (st == "stop") {
+//
+//     }
+//     return role
+// }
 func WhatToDoEntrance(myrole string) {
     if myrole == "crack" {
         crackJobEntrance()

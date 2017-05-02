@@ -215,11 +215,11 @@ func (j *Job) killHashCat() error {
         fmt.Println("[JOB] no hashcat running")
         return errors.New("ERROR: no hashcat running, can't kill")
     }
-    err := j.HashcatJob.Process.Kill()
-    if err != nil {
-        fmt.Println("[JOB] Failed to kill hashcat on stop message?")
-        panic(err)
-    }
+    j.HashcatJob.Process.Kill()
+    // if err != nil {
+    //     fmt.Println("[JOB] Failed to kill hashcat on stop message?")
+    //     panic(err)
+    // }
     j.HashcatJob = nil
     return nil
 }

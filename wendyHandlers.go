@@ -71,6 +71,7 @@ func (app *WendyHandlers) OnNewBackUpInit(msg wendy.Message) {
     leader.BackUpReceiveInitFromLeader(msg)
 }
 func (app *WendyHandlers) OnFirstJob(msg wendy.Message) {
+    // wgJobAppear.Done()
     fmt.Println("[Handler] OnFirstJob")
     newJob := &NewJobMessage{}
     err := bson.Unmarshal(msg.Value, newJob)
@@ -89,6 +90,7 @@ func (app *WendyHandlers) OnFirstJob(msg wendy.Message) {
 }
 func (app *WendyHandlers) OnReceiveFoundPass(msg wendy.Message) {
     fmt.Println("[Handler] OnReceiveFoundPass")
+    leader.SetDone()
     job.ReceiveFoundPass(msg)
 }
 func (app *WendyHandlers) OnAskAnotherPiece(msg wendy.Message) {
