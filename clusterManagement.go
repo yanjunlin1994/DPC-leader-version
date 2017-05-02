@@ -38,7 +38,7 @@ func ClusterManagement(option int) {
 	var credentials wendy.Passphrase = wendy.Passphrase(fileContents)
 
 	var heartbeatFreq int = 30
-	var entryNodeIP string
+	// var entryNodeIP string
 
 	var entryNodeIPs []string
 
