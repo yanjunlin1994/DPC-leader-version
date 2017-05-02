@@ -95,6 +95,8 @@ func (app *WendyHandlers) OnReceiveFoundPass(msg wendy.Message) {
         job = nil
         wgJobDone.Done()
     }
+    leaderComm.LeaderCommReset()
+    leader.LeaderReset()
 }
 func (app *WendyHandlers) OnAskAnotherPiece(msg wendy.Message) {
     fmt.Println("[Handler] OnAskAnotherPiece, from client")

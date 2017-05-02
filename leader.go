@@ -79,7 +79,18 @@ func NewLeader(self *wendy.Node, cluster *wendy.Cluster) *Leader {
 		logLevel:           LogLevelDebug,
 	}
 }
-
+func (le *Leader) LeaderReset() {
+    le.isActive = false
+    le.isBackup = false
+    le.IsWorking = false
+    le.IsDone = false
+    le.BackUps = wendy.EmptyNodeID()
+    le.chosenProposerID = wendy.EmptyNodeID()
+    le.routineTimeStamp = -1
+    le.updateTimeStamp = -1
+    le.JobMap = []JobEntry{}
+    le.wholeJob = nil
+}
 func (le *Leader) CheckNewProposalAndRespond(msg wendy.Message) error {
     le.debug("[CheckNewProposalAndRespond]")
     if le.checkIfAlreadyProposal(msg.Sender.ID) {

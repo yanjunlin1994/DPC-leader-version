@@ -71,6 +71,12 @@ func NewLeaderComm(self *wendy.Node, cluster *wendy.Cluster) *LeaderComm {
         // wgElect:               new(sync.WaitGroup),
 	}
 }
+func (l *LeaderComm) LeaderCommReset() {
+    l.Status = NoElected
+    l.currentLeader = wendy.EmptyNodeID()
+    l.ifLeader = false
+    l.PendingProcessQueue = []string{}
+}
 //propose a new cracking job
 func (l *LeaderComm) ProposeNewJob() bool{
     l.debug("[ProposeNewJob]")
