@@ -250,9 +250,15 @@ func (le *Leader) HandleNewNode(nodeid wendy.NodeID) {
     le.SendAnotherPieceToClient(jobIndex, nodeid)
 }
 func (le *Leader) HandleNodeLeft(nodeid wendy.NodeID) {
+    if (le.IsDone) {
+        return
+    }
     le.searchThisNodeUndoneWorkAndMarkUndone(nodeid.String())
 }
 func (le *Leader) searchThisNodeUndoneWorkAndMarkUndone(nodeid string) {
+    if (le.IsDone) {
+        return
+    }
     le.debug("[searchThisNodeUndoneWorkAndMarkUndone]")
     le.lock.RLock()
     var jobIndex int = -1
@@ -291,6 +297,9 @@ func (le *Leader) ReceiveRequestForAnotherPiece(nodeid wendy.NodeID, seq int) {
     le.SendAnotherPieceToClient(jobIndex, nodeid)
 }
 func (le *Leader) markNodeLastJobDone(nodeid string, seq int) {
+    if (le.IsDone) {
+        return
+    }
     le.debug("[markNodeLastJobDone] was " + strconv.Itoa(seq))
     le.lock.Lock()
     le.JobMap[seq].Status = 1
@@ -299,6 +308,9 @@ func (le *Leader) markNodeLastJobDone(nodeid string, seq int) {
 }
 
 func (le *Leader) SendAnotherPieceToClient(jobIndex int, nodeid wendy.NodeID) {
+    if (le.IsDone) {
+        return
+    }
     le.lock.RLock()
     jobentry := le.JobMap[jobIndex]
     payload := NewJobMessage{SeqNum: jobentry.SeqNum,
@@ -334,6 +346,9 @@ func (le *Leader) findAnUndoneJob() *JobEntry{
     return nil
 }
 func (le *Leader) ContactBackup() {
+    if (le.IsDone) {
+        return
+    }
     le.debug("[ContactBackup]")
     //----- chose one backup for now
     nodes := le.cluster.GetListOfNodes()
@@ -363,6 +378,9 @@ func (le *Leader) ContactBackup() {
     }
 }
 func (le *Leader) updateToBackup(seqn int, nodeid string, stat int) {
+    if (le.IsDone) {
+        return
+    }
     le.increaseUpdateTimeStamp()
     le.debug("[updateToBackup]")
 
@@ -381,6 +399,9 @@ func (le *Leader) updateToBackup(seqn int, nodeid string, stat int) {
     }
 }
 func (le *Leader) BackUpUpdateBackUp(seqn int, nodeid string, stat int) {
+    if (le.IsDone) {
+        return
+    }
     le.debug("[BackUpUpdateBackUp]")
     le.lock.Lock()
     le.JobMap[seqn].Node = nodeid

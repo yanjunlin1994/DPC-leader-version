@@ -10,7 +10,7 @@ import (
 // Distributed Password Cracker struct
 type WendyHandlers struct {
 	node    *wendy.Node
-	// cluster *wendy.Cluster
+	// cluster *wendy.Cluster?????
 }
 //--------------------------------Leader Communication part--------------------
 func (app *WendyHandlers) OnLeaderElectionDeliver(msg wendy.Message) {
