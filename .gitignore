@@ -1,1 +1,4 @@
 hashcat-3.5.0/
+.idea/
+*.exe
+DPC-leader-version.exe~
