@@ -492,6 +492,16 @@ func (le *Leader) GetIsDone() bool {
 	defer le.lock.RUnlock()
     return le.IsDone
 }
+func (le *Leader) GetActive() bool {
+    le.lock.RLock()
+	defer le.lock.RUnlock()
+    return le.isActive
+}
+func (le *Leader) GetBackUp() bool {
+    le.lock.RLock()
+	defer le.lock.RUnlock()
+    return le.isBackup
+}
 func (le *Leader) SetDone() {
     le.debug("[SetDone]")
     le.lock.Lock()

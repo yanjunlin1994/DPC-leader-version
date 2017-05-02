@@ -99,6 +99,9 @@ func (app *WendyHandlers) OnReceiveFoundPass(msg wendy.Message) {
     leader.LeaderReset()
 }
 func (app *WendyHandlers) OnAskAnotherPiece(msg wendy.Message) {
+    if !(leader.GetActive()) {
+        return
+    }
     fmt.Println("[Handler] OnAskAnotherPiece, from client")
     askJob := &AskAnotherMessage{}
     err := bson.Unmarshal(msg.Value, askJob)
@@ -125,6 +128,9 @@ func (app *WendyHandlers) OnRecvAnotherPiece(msg wendy.Message) {
     go job.StartJob()
 }
 func (app *WendyHandlers) OnBackUpRecvUpdate(msg wendy.Message) {
+    if !(leader.GetBackUp()) {
+        return
+    }
     fmt.Println("[Handler] On BackUp RecvUpdate, from Leader")
     newUpdate := &UpdateBackUpMessage{}
     err := bson.Unmarshal(msg.Value, newUpdate)
