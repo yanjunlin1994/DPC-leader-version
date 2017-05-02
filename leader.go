@@ -12,7 +12,7 @@ import (
     "os/exec"
 )
 const (
-    SPLIT_FOLD = 8
+    SPLIT_FOLD = 15
 )
 type WholeJob struct {
     HashType           int          `json:"hashtp,omitempty"`
