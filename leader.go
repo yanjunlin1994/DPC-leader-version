@@ -394,8 +394,8 @@ func (le *Leader) updateToBackup(seqn int, nodeid string, stat int) {
     msg := le.cluster.NewMessage(UPDATE_BACKUP, le.BackUps, data)
     err = le.cluster.Send(msg)
     if err != nil {
-        le.debug("[updateToBackup] backup failse")
-        le.findNewBackUp()
+        le.debug("[updateToBackup] backup failse, find new")
+        le.ContactBackup()
     }
 }
 func (le *Leader) BackUpUpdateBackUp(seqn int, nodeid string, stat int) {
@@ -414,9 +414,6 @@ func (le *Leader) BackUpBecomeLeader() {
     le.isActive = true
     le.isBackup = false
     le.lock.Unlock()
-
-}
-func (le *Leader) findNewBackUp() {
 
 }
 func (le *Leader) removeBackUp() {
