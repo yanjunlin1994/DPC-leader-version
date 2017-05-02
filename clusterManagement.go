@@ -40,12 +40,12 @@ func ClusterManagement(option int) {
 	var heartbeatFreq int = 30
 	var entryNodeIP string
 
-	//var entryNodeIPs []string
+	var entryNodeIPs []string
 
 	if option == 2 {
-        entryNodeIP = "127.0.0.1"
-	//var entryNames = []string{"yanjunlin.hopto.org", "yanjunlin1.hopto.org", "yanjunlin2.hopto.org"}
-        // entryNodeIPs = addrLookup(entryNames)
+        // entryNodeIP = "127.0.0.1"
+	var entryNames = []string{"yanjunlin.hopto.org", "yanjunlin1.hopto.org", "yanjunlin2.hopto.org"}
+        entryNodeIPs = addrLookup(entryNames)
     	}
 	var entryNodePort int = 18818
 
@@ -58,8 +58,8 @@ func ClusterManagement(option int) {
 	fmt.Println("[ClusterManagement] ID: ", id)
 
 	// Get IP addresses
-	 //var externalAddr string = getExternalIP()
-	var externalAddr string = "127.0.0.1"
+	 var externalAddr string = getExternalIP()
+	// var externalAddr string = "127.0.0.1"
 
 	fmt.Printf("[ClusterManagement] IP: %s : %d \n",externalAddr, wendyPort)
 	selfnode = wendy.NewNode(id, externalAddr, externalAddr, region, wendyPort)
@@ -86,13 +86,13 @@ func ClusterManagement(option int) {
 	// Join initial node's cluster
 	if option == 2 {
 		//bootstrapping [comment this out to disable bootstrapping]
-		//  err := joinCluster(entryNodeIPs, entryNodePort)
-        // 	 if err != nil {
-        // 	 fmt.Println("[ClusterManagement] Not able to join cluster via any available entry nodes")
-		// 	 panic(err)
-		//  }
+		 err := joinCluster(entryNodeIPs, entryNodePort)
+        	 if err != nil {
+        	 fmt.Println("[ClusterManagement] Not able to join cluster via any available entry nodes")
+			 panic(err)
+		 }
 		//no bootstrapping
-		cluster.Join(entryNodeIP, entryNodePort)
+		// cluster.Join(entryNodeIP, entryNodePort)
 	}
 
 	// fmt.Println("[ClusterManagement] Cluster configuration done.")
