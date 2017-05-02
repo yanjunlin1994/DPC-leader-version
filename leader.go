@@ -262,6 +262,9 @@ func (le *Leader) searchThisNodeUndoneWorkAndMarkUndone(nodeid string) {
     }
 }
 func (le *Leader) ReceiveRequestForAnotherPiece(nodeid wendy.NodeID, seq int) {
+    if (le.IsDone) {
+        return
+    }
     le.debug("[ReceiveRequestForAnotherPiece]")
     le.markNodeLastJobDone(nodeid.String(), seq)
     aJobEntry := le.findAnUndoneJob()
@@ -479,7 +482,7 @@ func (le *Leader) GetIsDone() bool {
     return le.IsDone
 }
 func (le *Leader) SetDone() {
-    le.debug("[SetActive]")
+    le.debug("[SetDone]")
     le.lock.Lock()
     le.IsDone = true
     le.lock.Unlock()

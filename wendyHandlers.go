@@ -93,6 +93,7 @@ func (app *WendyHandlers) OnReceiveFoundPass(msg wendy.Message) {
     if (job.ReceiveFoundPass(msg)) {
         leader.SetDone()
         job = nil
+        wgJobDone.Done()
     }
 }
 func (app *WendyHandlers) OnAskAnotherPiece(msg wendy.Message) {

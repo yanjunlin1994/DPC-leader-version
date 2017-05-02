@@ -7,8 +7,10 @@ import (
 	"strings"
 	"os/signal"
     "strconv"
+    "sync"
 )
 // var wgJobAppear sync.WaitGroup
+var wgJobDone sync.WaitGroup
 func main() {
     exitfix := make(chan os.Signal, 1)
 	signal.Notify(exitfix, os.Interrupt)
@@ -21,13 +23,20 @@ func main() {
 	} ()
     userChoice := SetUpOrJoinEntrance()
     ClusterManagementEntrance(userChoice)
-    myRole := AskForWhatToDo()
-    WhatToDoEntrance(myRole)
-    // wgJobAppear.Add(1)
-    // wgJobAppear.Wait()
-    // AskWhetherStop()
-    select{}
-    //WAHT IS NEXT STEP? MAYBE STATUS
+    for {
+        wgJobDone.Add(1)
+
+        myRole := AskForWhatToDo()
+        WhatToDoEntrance(myRole)
+        wgJobDone.Wait()
+        fmt.Println("A job finished, next job")
+        // wgJobAppear.Add(1)
+        // wgJobAppear.Wait()
+        // AskWhetherStop()
+
+        //WAHT IS NEXT STEP? MAYBE STATUS
+
+    }
 }
 func SetUpOrJoinEntrance() int{
     userChoice := -1

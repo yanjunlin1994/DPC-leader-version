@@ -188,10 +188,8 @@ func (j *Job) announceFound(foundPassword string) {
 		return
 	}
     for _, nodeIterate := range nodes {
-        if !nodeIterate.ID.Equals(j.self.ID) {
-            msg := j.cluster.NewMessage(FOUND_PASS, nodeIterate.ID, data)
-            j.cluster.Send(msg) //no need to check error
-        }
+        msg := j.cluster.NewMessage(FOUND_PASS, nodeIterate.ID, data)
+        j.cluster.Send(msg) //no need to check error
     }
 }
 func (j *Job) askLeaderANewPiece() {
