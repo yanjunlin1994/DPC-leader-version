@@ -90,8 +90,10 @@ func (app *WendyHandlers) OnFirstJob(msg wendy.Message) {
 }
 func (app *WendyHandlers) OnReceiveFoundPass(msg wendy.Message) {
     fmt.Println("[Handler] OnReceiveFoundPass")
-    leader.SetDone()
-    job.ReceiveFoundPass(msg)
+    if (job.ReceiveFoundPass(msg)) {
+        leader.SetDone()
+        job = nil
+    }
 }
 func (app *WendyHandlers) OnAskAnotherPiece(msg wendy.Message) {
     fmt.Println("[Handler] OnAskAnotherPiece, from client")

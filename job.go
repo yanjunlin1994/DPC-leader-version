@@ -226,13 +226,15 @@ func (j *Job) killHashCat() error {
 func (j *Job) GracefulStop() {
     j.leaderComm.NotifyLeaderIStop()
 }
-func (j *Job) ReceiveFoundPass(msg wendy.Message) {
+func (j *Job) ReceiveFoundPass(msg wendy.Message) bool {
     real, psw := j.verifyFoundedPassword(msg)
     if (real) {
         fmt.Println("[JOB] Receive correct password: " + psw)
         j.SetStatus(Found)
         j.killHashCat()
+        return true
     }
+    return false
 
 }
 func (j *Job) verifyFoundedPassword(msg wendy.Message) (bool, string){
