@@ -232,7 +232,7 @@ func (c *Cluster) Listen() error {
     go func() {
         // c.debug("[Listen]spin heartbeat thread")
 		for {
-            c.debug("[Listen]Send heartbeat")
+            // c.debug("[Listen]Send heartbeat")
             c.sendHeartbeats()
             time.Sleep(time.Duration(c.heartbeatFrequency) * time.Second)
 		}
@@ -336,7 +336,7 @@ func (c *Cluster) sendHeartbeats() {
             exitmsg := c.NewMessage(NODE_EXIT, node.ID, []byte{})
             snodes := c.Neighborhoodset.list()
         	for _, snode := range snodes {
-                c.debug("[sendHeartbeats] inform nodes exit")
+                // c.debug("[sendHeartbeats] inform nodes exit")
                 err := c.send(exitmsg, snode)
                 if err != nil {
                     c.fanOutError(err)
@@ -369,25 +369,25 @@ func (c *Cluster) deliver(msg Message) {
 	}
 }
 func (c *Cluster) deliverLeaderElection(msg Message) {
-    c.debug("[deliverLeaderElection]")
+    // c.debug("[deliverLeaderElection]")
 	for _, app := range c.applications {
 		app.OnLeaderElectionDeliver(msg)
 	}
 }
 func (c *Cluster) deliverNewProposalfromClient(msg Message) {
-    c.debug("[deliverNewProposalfromClient]")
+    // c.debug("[deliverNewProposalfromClient]")
 	for _, app := range c.applications {
 		app.OnNewProposalDeliver(msg)
 	}
 }
 func (c *Cluster) deliverNewBackUpInitFromLeader(msg Message) {
-    c.debug("[deliverNewBackUpInitFromLeaderl]")
+    // c.debug("[deliverNewBackUpInitFromLeaderl]")
 	for _, app := range c.applications {
 		app.OnNewBackUpInit(msg)
 	}
 }
 func (c *Cluster) deliverFirstJobFromLeader(msg Message) {
-    c.debug("[deliverFirstJobFromLeader]")
+    // c.debug("[deliverFirstJobFromLeader]")
 	for _, app := range c.applications {
 		app.OnFirstJob(msg)
 	}
@@ -399,25 +399,25 @@ func (c *Cluster) deliverFoundPass(msg Message) {
 	}
 }
 func (c *Cluster) deliverAskAnotherPieceFromClient(msg Message) {
-    c.debug("[deliverAskAnotherPieceFromClient]")
+    // c.debug("[deliverAskAnotherPieceFromClient]")
 	for _, app := range c.applications {
 		app.OnAskAnotherPiece(msg)
 	}
 }
 func (c *Cluster) deliverRecvAnotherPieceFromLeader(msg Message) {
-    c.debug("[deliverRecvAnotherPieceFromLeader]")
+    // c.debug("[deliverRecvAnotherPieceFromLeader]")
 	for _, app := range c.applications {
 		app.OnRecvAnotherPiece(msg)
 	}
 }
 func (c *Cluster) deliverUpdateBackUpFromLeader(msg Message) {
-    c.debug("[deliverUpdateBackUpFromLeader]")
+    // c.debug("[deliverUpdateBackUpFromLeader]")
 	for _, app := range c.applications {
 		app.OnBackUpRecvUpdate(msg)
 	}
 }
 func (c *Cluster) deliverNodeDontWantToWorkFromClient(msg Message) {
-    c.debug("[deliverNodeDontWantToWorkFromClient]")
+    // c.debug("[deliverNodeDontWantToWorkFromClient]")
     for _, app := range c.applications {
         app.OnNodeExit(msg.Sender)
     }
@@ -1141,9 +1141,9 @@ func (c *Cluster) remove(id NodeID) error {
         return nil
     } else {
         for _, app := range c.applications {
-    		c.debug("[remove]sending handler node exit.")
+    		// c.debug("[remove]sending handler node exit.")
     		app.OnNodeExit(*node)
-    		c.debug("[remove]sent handler node exit.")
+    		// c.debug("[remove]sent handler node exit.")
     	}
 
     }

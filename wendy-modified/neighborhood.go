@@ -180,16 +180,16 @@ func (n *NeighborhoodSet) HeartbeatReceivers() []*Node{
 	}
     if len(n.Nodes) == 2 {
         receivers = append(receivers, n.Nodes[(pos + 1) % 2])//wrap around
-        n.debug("[heartbeatReceivers]My pos in the set: " + strconv.Itoa(pos) + " | send to: " + strconv.Itoa((pos + 1) % 2))
+        // n.debug("[heartbeatReceivers]My pos in the set: " + strconv.Itoa(pos) + " | send to: " + strconv.Itoa((pos + 1) % 2))
 	} else if pos == 0 {
         receivers = append(receivers, n.Nodes[len(n.Nodes) - 1], n.Nodes[1])
-        n.debug("[heartbeatReceivers]My pos in the set: " + strconv.Itoa(pos) + " | send to: " + strconv.Itoa(len(n.Nodes) - 1) + " and " + strconv.Itoa(1))
+        // n.debug("[heartbeatReceivers]My pos in the set: " + strconv.Itoa(pos) + " | send to: " + strconv.Itoa(len(n.Nodes) - 1) + " and " + strconv.Itoa(1))
     } else if pos == (len(n.Nodes) - 1) {
         receivers = append(receivers, n.Nodes[len(n.Nodes) - 2], n.Nodes[0])
-        n.debug("[heartbeatReceivers]My pos in the set: " + strconv.Itoa(pos) + " | send to: " + strconv.Itoa(len(n.Nodes) - 2) + " and " + strconv.Itoa(0))
+        // n.debug("[heartbeatReceivers]My pos in the set: " + strconv.Itoa(pos) + " | send to: " + strconv.Itoa(len(n.Nodes) - 2) + " and " + strconv.Itoa(0))
     } else {
         receivers = append(receivers, n.Nodes[pos - 1], n.Nodes[pos + 1])
-        n.debug("[heartbeatReceivers]My pos in the set: " + strconv.Itoa(pos) + " | send to: " + strconv.Itoa(pos - 1) + " and " + strconv.Itoa(pos + 1))
+        // n.debug("[heartbeatReceivers]My pos in the set: " + strconv.Itoa(pos) + " | send to: " + strconv.Itoa(pos - 1) + " and " + strconv.Itoa(pos + 1))
     }
     return receivers
 }
