@@ -251,10 +251,12 @@ func (j *Job) verifyFoundedPassword(msg wendy.Message) (bool, string) {
 		panic(err)
 	}
 	var receivedPassword []string
-	if runtime.GOOS == "windows" {
-		receivedPassword = strings.Split(tmpList.Password, "\r\n")
+    if runtime.GOOS == "windows" {
+				receivedPassword = strings.Split(tmpList.Password, "\r\n")
+				receivedPassword = strings.Split(receivedPassword[0], "\n")
 	} else {
-		receivedPassword = strings.Split(tmpList.Password, "\n")
+				receivedPassword = strings.Split(tmpList.Password, "\r\n")
+				receivedPassword = strings.Split(receivedPassword[0], "\n")
 	}
 	if tmpList.HashType == 0 {
 		ReceivedPasswordHash := md5.Sum([]byte(receivedPassword[0]))
